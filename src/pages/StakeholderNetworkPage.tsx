@@ -86,8 +86,22 @@ export default function StakeholderNetworkPage() {
     ? filteredNodes.find((n) => n.id === selectedNodeId) ?? stakeholderGraph.nodes.find((n) => n.id === selectedNodeId)
     : null
 
-  const graphWidth = 1000
-  const graphHeight = 700
+  const graphWrapRef = useRef<HTMLDivElement>(null)
+  const [graphSize, setGraphSize] = useState({ width: 800, height: 500 })
+
+  useEffect(() => {
+    const el = graphWrapRef.current
+    if (!el) return
+    const ro = new ResizeObserver((entries) => {
+      const { width, height } = entries[0]?.contentRect ?? { width: 800, height: 500 }
+      setGraphSize({
+        width: Math.max(300, Math.floor(width)),
+        height: Math.max(300, Math.floor(height)),
+      })
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   return (
     <div className="network-page">
@@ -109,7 +123,7 @@ export default function StakeholderNetworkPage() {
           />
           <Legend />
         </div>
-        <div className="network-graph-wrap">
+        <div ref={graphWrapRef} className="network-graph-wrap">
           <ForceGraph
             nodes={filteredNodes}
             edges={filteredEdges}
@@ -117,8 +131,8 @@ export default function StakeholderNetworkPage() {
             pathEdgeIds={pathEdgeIds}
             selectedNodeId={selectedNodeId}
             onSelectNode={setSelectedNodeId}
-            width={graphWidth}
-            height={graphHeight}
+            width={graphSize.width}
+            height={graphSize.height}
           />
         </div>
         {selectedNode && (
