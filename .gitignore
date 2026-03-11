@@ -7,4 +7,7 @@ dist
 *.log
 .vite
 *.tsbuildinfo
-public/Coral Farming
+# Exclude largest media files; documents/readings are committed so library links work on deploy
+public/Coral Farming/New 2026/LivingSeasLeonBoeyFeb3.mp4
+public/Coral Farming/Trip Notes/Interviews/coralCatchRecording.mp4
+public/Coral Farming/Trip Notes/Interviews/indonesia biru foundation.m4a
