@@ -1,36 +1,56 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import type { Hypothesis } from '@/types/research'
 import { hypotheses as initialHypotheses } from '@/data/hypotheses'
+import { getResearchData, setResearchData } from '@/lib/researchStorage'
 
 const STORAGE_KEY = 'coral-hypotheses'
 
-function loadHypotheses(): Hypothesis[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as Hypothesis[]
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed
-    }
-  } catch {
-    // ignore
-  }
-  return initialHypotheses
-}
-
-function saveHypotheses(h: Hypothesis[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(h))
-}
+const SAVED_INDICATOR_MS = 2000
 
 export default function HypothesisTracker() {
-  const [hypotheses, setHypotheses] = useState<Hypothesis[]>(loadHypotheses)
+  const [hypotheses, setHypotheses] = useState<Hypothesis[]>(initialHypotheses)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [addEvidenceFor, setAddEvidenceFor] = useState<string | null>(null)
   const [newQuote, setNewQuote] = useState('')
   const [newSource, setNewSource] = useState('')
   const [newDate, setNewDate] = useState('')
+  const [savedAt, setSavedAt] = useState<number | null>(null)
+  const [saveStatus, setSaveStatus] = useState<'cloud' | 'local' | null>(null)
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isInitialMount = useRef(true)
 
   useEffect(() => {
-    saveHypotheses(hypotheses)
+    getResearchData<Hypothesis[]>(STORAGE_KEY).then((data) => {
+      if (!Array.isArray(data) || data.length === 0) return
+      const valid = data.filter(
+        (h): h is Hypothesis =>
+          h != null &&
+          typeof h === 'object' &&
+          typeof (h as Hypothesis).id === 'string' &&
+          typeof (h as Hypothesis).title === 'string' &&
+          Array.isArray((h as Hypothesis).evidence)
+      )
+      if (valid.length > 0) setHypotheses(valid)
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!isInitialMount.current) {
+      setResearchData(STORAGE_KEY, hypotheses).then((synced) => {
+        setSavedAt(Date.now())
+        setSaveStatus(synced ? 'cloud' : 'local')
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+        saveTimeoutRef.current = setTimeout(() => {
+          setSavedAt(null)
+          setSaveStatus(null)
+        }, SAVED_INDICATOR_MS)
+      })
+    } else {
+      isInitialMount.current = false
+    }
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+    }
   }, [hypotheses])
 
   const addEvidence = useCallback(
@@ -76,7 +96,12 @@ export default function HypothesisTracker() {
     <div className="hypothesis-tracker">
       <h1>Hypothesis Tracker</h1>
       <p className="tracker-intro">
-        Track evidence from field interviews against H1–H4. Evidence is saved in this browser.
+        Track evidence from field interviews against the core institutional hypotheses (H1-H4). Evidence is saved in this browser.
+        {savedAt != null && (
+          <span className={`save-indicator ${saveStatus === 'local' ? 'save-local' : ''}`}>
+            {saveStatus === 'local' ? 'Saved locally' : 'Saved'}
+          </span>
+        )}
       </p>
       <div className="hypothesis-list">
         {hypotheses.map((h) => (
@@ -85,12 +110,13 @@ export default function HypothesisTracker() {
               type="button"
               className="hypothesis-header"
               onClick={() => setExpandedId(expandedId === h.id ? null : h.id)}
+              aria-expanded={expandedId === h.id}
             >
               <span className="hypothesis-id">{h.id}</span>
               <span className="hypothesis-title">{h.title}</span>
-              <span className="hypothesis-toggle">{expandedId === h.id ? '−' : '+'}</span>
+              <span className="hypothesis-toggle" aria-hidden>{expandedId === h.id ? '−' : '+'}</span>
             </button>
-            {expandedId === h.id && (
+            <div className="hypothesis-body-wrap" data-expanded={expandedId === h.id}>
               <div className="hypothesis-body">
                 <p className="hypothesis-text">{h.text}</p>
                 <h4>Evidence</h4>
@@ -149,7 +175,7 @@ export default function HypothesisTracker() {
                   </button>
                 )}
               </div>
-            )}
+            </div>
           </section>
         ))}
       </div>

@@ -8,7 +8,7 @@ export default function CaseStudies() {
     <div className="case-studies">
       <h1>Case Studies</h1>
       <p className="cases-intro">
-        Comparative cases from other ecosystems — relevance for reef financing mechanism design.
+        Comparative environmental financing cases used to identify why some ecosystems become fundable while coral reefs remain underfunded.
       </p>
       <div className="case-cards">
         {caseStudies.map((c) => (
@@ -20,17 +20,18 @@ export default function CaseStudies() {
               type="button"
               className="case-card-header"
               onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
+              aria-expanded={expandedId === c.id}
             >
               <h2>{c.title}</h2>
-              <span className="case-toggle">{expandedId === c.id ? '−' : '+'}</span>
+              <span className="case-toggle" aria-hidden>{expandedId === c.id ? '−' : '+'}</span>
             </button>
-            {expandedId === c.id && (
+            <div className="case-body-wrap" data-expanded={expandedId === c.id}>
               <div className="case-body">
                 <p className="case-summary">{c.summary}</p>
                 <h4>Relevance to reef financing</h4>
                 <p className="case-relevance">{c.relevance}</p>
               </div>
-            )}
+            </div>
           </article>
         ))}
       </div>

@@ -1,14 +1,32 @@
+import { useState, useEffect, useRef } from 'react'
 import { Outlet, NavLink } from 'react-router-dom'
 
 export default function Layout({ children }: { children?: React.ReactNode }) {
+  const mainRef = useRef<HTMLElement>(null)
+  const [showBackToTop, setShowBackToTop] = useState(false)
+
+  useEffect(() => {
+    const el = mainRef.current
+    if (!el) return
+    const onScroll = () => setShowBackToTop(el.scrollTop > 400)
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [])
+
+  const scrollToTop = () => {
+    mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   const nav = [
     { to: '/', label: 'Dashboard' },
     { to: '/network', label: 'Stakeholder Network' },
+    { to: '/contacts', label: 'Contacts' },
     { to: '/funding', label: 'Funding Flows' },
     { to: '/hypotheses', label: 'Hypothesis Tracker' },
     { to: '/interview', label: 'Interview Protocol' },
     { to: '/cases', label: 'Case Studies' },
     { to: '/bottlenecks', label: 'Bottleneck Diagnostic' },
+    { to: '/library', label: 'Research Library' },
   ]
   return (
     <div className="layout">
@@ -22,9 +40,19 @@ export default function Layout({ children }: { children?: React.ReactNode }) {
           ))}
         </nav>
       </aside>
-      <main className="main">
+      <main ref={mainRef} className="main">
         {children ?? <Outlet />}
       </main>
+      {showBackToTop && (
+        <button
+          type="button"
+          className="back-to-top"
+          onClick={scrollToTop}
+          aria-label="Back to top"
+        >
+          ↑
+        </button>
+      )}
     </div>
   )
 }

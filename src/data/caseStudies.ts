@@ -4,19 +4,19 @@ export const caseStudies: CaseStudy[] = [
   {
     id: 'louisiana',
     title: 'Louisiana Coastal Wetlands (CWPPRA)',
-    summary: 'US federal program that classifies wetlands as storm protection infrastructure; federal engineering budget applies. Funding is institutionalized rather than voluntary.',
-    relevance: 'Model for classifying reefs as coastal protection assets and routing public infrastructure budget to restoration.',
+    summary: 'Wetland restoration is financed through disaster mitigation and infrastructure budgets because wetlands are treated as storm-surge and flood protection assets with measurable avoided losses.',
+    relevance: 'Shows how ecosystem protection scales when it is institutionalized as infrastructure protection, not positioned as optional philanthropy.',
   },
   {
     id: 'wildfire',
     title: 'Wildfire / Forest Management',
-    summary: 'Institutional mechanisms (insurance, land management budgets, utility liability) create obligatory spending on prevention and restoration.',
-    relevance: 'Illustrates how insurance linkage and liability can create sustained funding flows for ecosystem management.',
+    summary: 'Wildfire prevention attracts large funding due to immediate, visible damage to homes and infrastructure; insurance systems and public safety budgets reinforce recurring spending.',
+    relevance: 'Highlights the financing power of visibility and measurable loss; reef systems need clearer risk framing to trigger comparable budget and insurance responses.',
   },
   {
     id: 'mangroves',
     title: 'Mangrove Blue Carbon',
-    summary: 'Verified carbon credits issued for mangrove restoration; revenue funds ongoing maintenance. Standardized MRV and market access.',
-    relevance: 'Closest analogue for coral blue carbon; highlights need for IPCC/Verra standard and clear cost-per-tonne frameworks.',
+    summary: 'Mangroves entered climate finance through measurable and verifiable carbon methodologies, allowing credits to be issued and sold into established market infrastructure.',
+    relevance: 'Demonstrates the role of standards and market plumbing; coral reefs currently lack an equally credible integration pathway and remain dependent on fragmented grants.',
   },
 ]

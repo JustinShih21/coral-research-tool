@@ -4,11 +4,18 @@ export type ActorCategory =
   | 'government'
   | 'investor_funder'
   | 'fisheries'
+  | 'degradation_driver'
   | 'insurance_finance'
 
 export type InterviewStatus = 'confirmed' | 'target' | 'completed' | 'not_pursued'
 
-export type RelationshipType = 'funding' | 'dependency' | 'data' | 'regulation' | 'proposed'
+export type RelationshipType =
+  | 'funding'
+  | 'dependency'
+  | 'data'
+  | 'regulation'
+  | 'degradation'
+  | 'proposed'
 
 export type FlowDirection = 'unidirectional' | 'bidirectional'
 

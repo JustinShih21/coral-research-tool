@@ -7,10 +7,18 @@ const CATEGORIES: ActorCategory[] = [
   'government',
   'investor_funder',
   'fisheries',
+  'degradation_driver',
   'insurance_finance',
 ]
 
-const REL_TYPES: RelationshipType[] = ['funding', 'dependency', 'data', 'regulation', 'proposed']
+const REL_TYPES: RelationshipType[] = [
+  'funding',
+  'dependency',
+  'data',
+  'regulation',
+  'degradation',
+  'proposed',
+]
 
 export default function Legend() {
   return (

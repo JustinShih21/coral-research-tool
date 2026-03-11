@@ -6,6 +6,7 @@ export const CATEGORY_COLORS: Record<ActorCategory, string> = {
   government: '#0A1E3A',
   investor_funder: '#C8922A',
   fisheries: '#2D7A4A',
+  degradation_driver: '#C2410C',
   insurance_finance: '#5B3A8A',
 }
 
@@ -15,6 +16,7 @@ export const CATEGORY_LABELS: Record<ActorCategory, string> = {
   government: 'Government',
   investor_funder: 'Investors / Funders',
   fisheries: 'Fisheries',
+  degradation_driver: 'Degradation Drivers',
   insurance_finance: 'Insurance / Finance',
 }
 
@@ -33,5 +35,6 @@ export const RELATIONSHIP_STYLE: Record<
   dependency: { stroke: '#2E6B8A', strokeDasharray: '6 4', strokeWidth: 1.5 },
   data: { stroke: '#007B6E', strokeDasharray: '2 3', strokeWidth: 1 },
   regulation: { stroke: '#0A1E3A', strokeDasharray: 'none', strokeWidth: 1 },
+  degradation: { stroke: '#C2410C', strokeDasharray: '3 4', strokeWidth: 1.5 },
   proposed: { stroke: '#94a3b8', strokeDasharray: '8 4', strokeWidth: 1 },
 }

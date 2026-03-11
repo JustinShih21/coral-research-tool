@@ -1,32 +1,29 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import ForceGraph from '@/components/StakeholderNetwork/ForceGraph'
 import NodeDetailPanel from '@/components/StakeholderNetwork/NodeDetailPanel'
 import Legend from '@/components/StakeholderNetwork/Legend'
 import Filters from '@/components/StakeholderNetwork/Filters'
 import { stakeholderGraph } from '@/data/stakeholders'
 import { useGraphData, defaultFilters, type GraphFilters } from '@/hooks/useGraphData'
+import { getResearchData, setResearchData } from '@/lib/researchStorage'
 
 const STORAGE_KEY_NOTES = 'coral-network-notes'
-
-function loadNotes(): Record<string, string> {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_NOTES)
-    return raw ? JSON.parse(raw) : {}
-  } catch {
-    return {}
-  }
-}
-
-function saveNotes(notes: Record<string, string>) {
-  localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(notes))
-}
 
 export default function StakeholderNetworkPage() {
   const [filters, setFilters] = useState<GraphFilters>(defaultFilters)
   const [pathFrom, setPathFrom] = useState<string | null>(null)
   const [pathTo, setPathTo] = useState<string | null>(null)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
-  const [nodeNotes, setNodeNotes] = useState<Record<string, string>>(loadNotes)
+  const [nodeNotes, setNodeNotes] = useState<Record<string, string>>({})
+  const [savedAt, setSavedAt] = useState<number | null>(null)
+  const [saveStatus, setSaveStatus] = useState<'cloud' | 'local' | null>(null)
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    getResearchData<Record<string, string>>(STORAGE_KEY_NOTES).then((data) => {
+      if (data && typeof data === 'object' && !Array.isArray(data)) setNodeNotes(data)
+    })
+  }, [])
 
   const { filteredNodes, filteredEdges, pathNodeIds, pathEdgeIds } = useGraphData(
     stakeholderGraph.nodes,
@@ -39,15 +36,39 @@ export default function StakeholderNetworkPage() {
   const handleNotesChange = useCallback((nodeId: string, notes: string) => {
     setNodeNotes((prev) => {
       const next = { ...prev, [nodeId]: notes }
-      saveNotes(next)
+      setResearchData(STORAGE_KEY_NOTES, next).then((synced) => {
+        setSavedAt(Date.now())
+        setSaveStatus(synced ? 'cloud' : 'local')
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+        saveTimeoutRef.current = setTimeout(() => {
+          setSavedAt(null)
+          setSaveStatus(null)
+        }, 2000)
+      })
       return next
     })
   }, [])
 
+  useEffect(() => () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current) }, [])
+
+  useEffect(() => {
+    if (!selectedNodeId) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedNodeId(null)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [selectedNodeId])
+
   const handleExport = useCallback(() => {
+    const nodesWithNotes = filteredNodes.map((node) => ({
+      ...node,
+      notes: nodeNotes[node.id] ?? node.notes,
+    }))
     const payload = {
-      nodes: filteredNodes,
+      nodes: nodesWithNotes,
       edges: filteredEdges,
+      nodeNotesOverride: nodeNotes,
       exportedAt: new Date().toISOString(),
     }
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
@@ -59,7 +80,7 @@ export default function StakeholderNetworkPage() {
     a.download = `coral-stakeholder-network-${new Date().toISOString().slice(0, 10)}.json`
     a.click()
     URL.revokeObjectURL(url)
-  }, [filteredNodes, filteredEdges])
+  }, [filteredNodes, filteredEdges, nodeNotes])
 
   const selectedNode = selectedNodeId
     ? filteredNodes.find((n) => n.id === selectedNodeId) ?? stakeholderGraph.nodes.find((n) => n.id === selectedNodeId)
@@ -72,7 +93,7 @@ export default function StakeholderNetworkPage() {
     <div className="network-page">
       <h1>Stakeholder Network</h1>
       <p className="network-intro">
-        Interactive map of actors and relationships. Click a node to open details; use filters and path highlight to explore.
+        Interactive map of beneficiaries, protection actors, governance institutions, and degradation drivers. Click a node for details; use filters and path highlight to inspect coordination and financing gaps.
       </p>
       <div className="network-content">
         <div className="network-side">
@@ -110,6 +131,8 @@ export default function StakeholderNetworkPage() {
               onClose={() => setSelectedNodeId(null)}
               onNotesChange={handleNotesChange}
               notes={nodeNotes[selectedNode.id]}
+              lastSavedAt={savedAt}
+              saveStatus={saveStatus}
             />
           </aside>
         )}

@@ -1,29 +1,49 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { interviewProtocol } from '@/data/interviewProtocol'
+import {
+  interviewDimensions,
+  fieldObjectives,
+  fieldInsightExample,
+} from '@/data/researchFramework'
+import { getResearchData, setResearchData } from '@/lib/researchStorage'
 
 const STORAGE_KEY = 'coral-interview-notes'
 
-function loadNotes(): Record<string, string> {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : {}
-  } catch {
-    return {}
-  }
-}
-
-function saveNotes(notes: Record<string, string>) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(notes))
-}
+const SAVED_INDICATOR_MS = 2000
 
 export default function InterviewProtocol() {
   const [expandedSection, setExpandedSection] = useState<string | null>(
     interviewProtocol[0]?.id ?? null
   )
-  const [notes, setNotes] = useState<Record<string, string>>(loadNotes)
+  const [notes, setNotes] = useState<Record<string, string>>({})
+  const [savedAt, setSavedAt] = useState<number | null>(null)
+  const [saveStatus, setSaveStatus] = useState<'cloud' | 'local' | null>(null)
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isInitialMount = useRef(true)
 
   useEffect(() => {
-    saveNotes(notes)
+    getResearchData<Record<string, string>>(STORAGE_KEY).then((data) => {
+      if (data && typeof data === 'object' && !Array.isArray(data)) setNotes(data)
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!isInitialMount.current) {
+      setResearchData(STORAGE_KEY, notes).then((synced) => {
+        setSavedAt(Date.now())
+        setSaveStatus(synced ? 'cloud' : 'local')
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+        saveTimeoutRef.current = setTimeout(() => {
+          setSavedAt(null)
+          setSaveStatus(null)
+        }, SAVED_INDICATOR_MS)
+      })
+    } else {
+      isInitialMount.current = false
+    }
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+    }
   }, [notes])
 
   const setNote = useCallback((questionId: string, value: string) => {
@@ -34,8 +54,41 @@ export default function InterviewProtocol() {
     <div className="interview-protocol">
       <h1>Interview Protocol</h1>
       <p className="protocol-intro">
-        Question guides by stakeholder type. Use the note fields during or after field interviews.
+        Question guides by stakeholder type. Use note fields during interviews and code findings against the shared dimensions below.
+        {savedAt != null && (
+          <span className={`save-indicator ${saveStatus === 'local' ? 'save-local' : ''}`}>
+            {saveStatus === 'local' ? 'Saved locally' : 'Saved'}
+          </span>
+        )}
       </p>
+      <section className="protocol-reference">
+        <h2>Core Field Objectives</h2>
+        <ol>
+          {fieldObjectives.map((objective) => (
+            <li key={objective}>{objective}</li>
+          ))}
+        </ol>
+      </section>
+      <section className="protocol-reference">
+        <h2>Interview Coding Dimensions</h2>
+        <div className="protocol-dimensions">
+          {interviewDimensions.map((dimension) => (
+            <article key={dimension.id} className="protocol-dimension-card">
+              <h3>{dimension.name}</h3>
+              <p>{dimension.prompt}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+      <section className="protocol-reference">
+        <h2>{fieldInsightExample.title}</h2>
+        <ul>
+          {fieldInsightExample.observations.map((observation) => (
+            <li key={observation}>{observation}</li>
+          ))}
+        </ul>
+        <p className="protocol-insight">{fieldInsightExample.interpretation}</p>
+      </section>
       <div className="protocol-sections">
         {interviewProtocol.map((section) => (
           <section key={section.id} className="protocol-section">
@@ -45,11 +98,12 @@ export default function InterviewProtocol() {
               onClick={() =>
                 setExpandedSection(expandedSection === section.id ? null : section.id)
               }
+              aria-expanded={expandedSection === section.id}
             >
               <h2>{section.stakeholderType}</h2>
-              <span className="protocol-toggle">{expandedSection === section.id ? '−' : '+'}</span>
+              <span className="protocol-toggle" aria-hidden>{expandedSection === section.id ? '−' : '+'}</span>
             </button>
-            {expandedSection === section.id && (
+            <div className="protocol-body-wrap" data-expanded={expandedSection === section.id}>
               <ul className="protocol-questions">
                 {section.questions.map((q) => (
                   <li key={q.id} className="protocol-question">
@@ -64,7 +118,7 @@ export default function InterviewProtocol() {
                   </li>
                 ))}
               </ul>
-            )}
+            </div>
           </section>
         ))}
       </div>

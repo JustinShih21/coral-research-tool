@@ -8,10 +8,18 @@ const CATEGORIES: ActorCategory[] = [
   'government',
   'investor_funder',
   'fisheries',
+  'degradation_driver',
   'insurance_finance',
 ]
 
-const REL_TYPES: RelationshipType[] = ['funding', 'dependency', 'data', 'regulation', 'proposed']
+const REL_TYPES: RelationshipType[] = [
+  'funding',
+  'dependency',
+  'data',
+  'regulation',
+  'degradation',
+  'proposed',
+]
 
 const STATUSES: InterviewStatus[] = ['confirmed', 'target', 'completed', 'not_pursued']
 

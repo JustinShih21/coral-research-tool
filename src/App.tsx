@@ -7,6 +7,8 @@ import HypothesisTracker from './pages/HypothesisTracker'
 import InterviewProtocol from './pages/InterviewProtocol'
 import CaseStudies from './pages/CaseStudies'
 import BottleneckDiagnostic from './pages/BottleneckDiagnostic'
+import ResearchLibrary from './pages/ResearchLibrary'
+import Contacts from './pages/Contacts'
 
 export default function App() {
   return (
@@ -19,6 +21,8 @@ export default function App() {
         <Route path="/interview" element={<InterviewProtocol />} />
         <Route path="/cases" element={<CaseStudies />} />
         <Route path="/bottlenecks" element={<BottleneckDiagnostic />} />
+        <Route path="/library" element={<ResearchLibrary />} />
+        <Route path="/contacts" element={<Contacts />} />
       </Routes>
     </Layout>
   )

@@ -3,26 +3,26 @@ import type { Hypothesis } from '@/types/research'
 export const hypotheses: Hypothesis[] = [
   {
     id: 'H1',
-    title: 'Beneficiary Recognition',
-    text: 'Reef-dependent actors (tourism, fisheries) recognize reef value in general terms but do not calculate or act on their specific financial exposure to reef degradation. Recognition is abstract, not operational.',
+    title: 'Institutional Fragmentation Hypothesis',
+    text: 'Reef financing fails because responsibility is fragmented across fisheries authorities, marine protected areas, tourism regulators, environmental ministries, and coastal development bodies without a unified financing mandate.',
     evidence: [],
   },
   {
     id: 'H2',
-    title: 'Free-Rider Dynamics',
-    text: 'Even among actors who recognize dependency, collective action problems dominate. Individual actors are unwilling to fund restoration unilaterally when competitors and neighbors benefit without contributing.',
+    title: 'Visibility and Salience Hypothesis',
+    text: 'Reef decline attracts less funding than visible crises because degradation is underwater and gradual, reducing political urgency, media attention, and pressure on beneficiaries to pay.',
     evidence: [],
   },
   {
     id: 'H3',
-    title: 'Institutional Gap',
-    text: 'The primary barrier is not behavioral reluctance but the absence of any institutional mechanism (reef fund, conservation fee, government budget line, insurance linkage) that makes reef funding a normal cost of doing business.',
+    title: 'Institutional Bootstrapping Hypothesis',
+    text: 'Financing is blocked by a circular dependency: credible investors require MRV and governance infrastructure, but building that infrastructure requires financing before a market mechanism is in place.',
     evidence: [],
   },
   {
     id: 'H4',
-    title: 'Carbon Framing Failure',
-    text: 'Attempts to attract investment via carbon sequestration metrics have failed because investors request carbon data without clear frameworks for acting on it, and because coral\'s sequestration profile differs from more familiar asset classes like forests.',
+    title: 'Time-Horizon Mismatch Hypothesis',
+    text: 'Reef recovery spans decades, while political cycles (2-5 years), annual ESG reporting, and typical investor timelines (5-10 years) favor short-term outcomes, reducing commitment to reef protection.',
     evidence: [],
   },
 ]

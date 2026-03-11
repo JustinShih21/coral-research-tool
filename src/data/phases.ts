@@ -5,24 +5,42 @@ export const researchPhases: Phase[] = [
     id: 1,
     name: 'Scope & Framework Development',
     timing: 'Pre-Field (Now)',
-    keyActivities: ['Literature synthesis', 'Hypothesis formation', 'Stakeholder mapping', 'Interview guide design'],
+    keyActivities: [
+      'Define mission and central thesis',
+      'Set structural barrier framework',
+      'Map four institutional actor systems',
+      'Finalize interview and coding protocol',
+    ],
   },
   {
     id: 2,
     name: 'Field Research — Indonesia',
     timing: '1 Week In-Country',
-    keyActivities: ['Stakeholder interviews (restoration orgs, tourism operators)', 'Site observation', 'Funding flow documentation'],
+    keyActivities: [
+      'Interview beneficiaries, protectors, regulators, and funders',
+      'Document degradation drivers and enforcement constraints',
+      'Validate where coordination failures occur',
+    ],
   },
   {
     id: 3,
     name: 'Analysis & Synthesis',
     timing: 'Post-Field (Weeks 1–2)',
-    keyActivities: ['Interview coding', 'Bottleneck analysis', 'Institutional gap mapping', 'Cross-case comparison'],
+    keyActivities: [
+      'Code interviews across five dimensions',
+      'Score dominant financing bottlenecks',
+      'Map structural failure points and leverage points',
+      'Compare evidence against wetlands, wildfire, and mangroves',
+    ],
   },
   {
     id: 4,
     name: 'Tool & Framework Output',
     timing: 'Post-Field (Weeks 2–4)',
-    keyActivities: ['Financing gap diagnostic', 'Stakeholder decision matrix', 'Final research report'],
+    keyActivities: [
+      'Deliver financing gap diagnostic and actor matrix',
+      'Define realistic financing and governance options',
+      'Produce final institutional framework report',
+    ],
   },
 ]

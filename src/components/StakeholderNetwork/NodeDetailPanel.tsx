@@ -8,6 +8,8 @@ interface NodeDetailPanelProps {
   onClose: () => void
   onNotesChange?: (nodeId: string, notes: string) => void
   notes?: string
+  lastSavedAt?: number | null
+  saveStatus?: 'cloud' | 'local' | null
 }
 
 export default function NodeDetailPanel({
@@ -16,7 +18,10 @@ export default function NodeDetailPanel({
   onClose,
   onNotesChange,
   notes = '',
+  lastSavedAt = null,
+  saveStatus = null,
 }: NodeDetailPanelProps) {
+  const showSaved = lastSavedAt != null
   const related = edges.filter((e) => e.source === node.id || e.target === node.id)
   const displayNotes = notes || node.notes
 
@@ -24,9 +29,12 @@ export default function NodeDetailPanel({
     <div className="node-detail-panel">
       <div className="node-detail-header">
         <h2>{node.name}</h2>
-        <button type="button" className="node-detail-close" onClick={onClose} aria-label="Close">
-          ×
-        </button>
+        <div className="node-detail-header-actions">
+          <span className="node-detail-escape-hint" aria-hidden>Esc to close</span>
+          <button type="button" className="node-detail-close" onClick={onClose} aria-label="Close panel">
+            ×
+          </button>
+        </div>
       </div>
       <dl className="node-detail-meta">
         <dt>Category</dt>
@@ -69,6 +77,11 @@ export default function NodeDetailPanel({
       {onNotesChange && (
         <section className="node-detail-notes">
           <label htmlFor="node-notes">Interview notes</label>
+          {showSaved && (
+            <span className={`save-indicator ${saveStatus === 'local' ? 'save-local' : ''}`}>
+              {saveStatus === 'local' ? 'Saved locally' : 'Saved'}
+            </span>
+          )}
           <textarea
             id="node-notes"
             value={displayNotes}
