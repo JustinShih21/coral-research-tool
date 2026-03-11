@@ -327,6 +327,25 @@ input, textarea {
 .node-detail-meta dd {
   margin: 0;
 }
+.node-detail-section {
+  margin-bottom: 1.25rem;
+}
+.node-detail-section-title {
+  margin: 0 0 0.5rem;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+}
+.node-detail-label { font-weight: 500; }
+.node-detail-score { font-weight: 500; }
+.node-detail-hint {
+  margin: 0.25rem 0 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
 .node-detail-quote {
   margin: 0 0 1rem;
   padding-left: 1rem;
@@ -815,6 +834,20 @@ input, textarea {
 .library-meta .library-source::before { content: 'Source: '; }
 .library-meta .library-topic { background: var(--color-bg); padding: 0.2rem 0.5rem; border-radius: 6px; }
 .library-link { display: inline-block; margin-top: 0.5rem; font-size: 13px; color: var(--color-primary); font-weight: 500; }
+.library-card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+.library-card-link:hover .library-link { text-decoration: underline; }
+.library-card-no-link { cursor: default; }
+.library-no-link {
+  margin: 0.75rem 0 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+.library-no-link code { font-size: 12px; background: var(--color-bg); padding: 0.1rem 0.35rem; border-radius: 4px; }
 .recording-card .recording-type { text-transform: capitalize; background: rgba(91, 58, 138, 0.12); color: var(--color-purple); padding: 0.2rem 0.5rem; border-radius: 6px; }
 .recording-embed { margin-top: 0.75rem; border-radius: var(--radius); overflow: hidden; background: #000; }
 .recording-player { width: 100%; max-height: 280px; display: block; }

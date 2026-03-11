@@ -84,7 +84,16 @@ export default function ForceGraph({
     const svg = d3.select(svgRef.current)
     svg.selectAll('*').remove()
 
-    const g = svg.append('g')
+    const padding = NODE_RADIUS_MAX + 20
+    svg
+      .append('defs')
+      .append('clipPath')
+      .attr('id', 'graph-clip')
+      .append('rect')
+      .attr('width', width)
+      .attr('height', height)
+
+    const g = svg.append('g').attr('clip-path', 'url(#graph-clip)')
 
     const link = g
       .append('g')
@@ -125,6 +134,7 @@ export default function ForceGraph({
           .on('drag', (event, d) => {
             d.x = event.x
             d.y = event.y
+            clampNode(d)
             ticked()
           })
           .on('end', () => {
@@ -166,7 +176,18 @@ export default function ForceGraph({
         tooltip.style('visibility', 'hidden')
       })
 
+    function clampNode(d: D3Node) {
+      const r = radiusFromNode(d)
+      const minX = r + padding
+      const maxX = width - r - padding
+      const minY = r + padding
+      const maxY = height - r - padding
+      d.x = Math.max(minX, Math.min(maxX, d.x ?? width / 2))
+      d.y = Math.max(minY, Math.min(maxY, d.y ?? height / 2))
+    }
+
     function ticked() {
+      d3Nodes.forEach(clampNode)
       link
         .attr('x1', (d) => (d.source as D3Node).x ?? 0)
         .attr('y1', (d) => (d.source as D3Node).y ?? 0)

@@ -1,6 +1,14 @@
 import type { GraphNode, GraphEdge } from '@/types/graph'
-import { CATEGORY_LABELS } from './constants'
-import { RELATIONSHIP_STYLE } from './constants'
+import {
+  CATEGORY_LABELS,
+  DEPENDENCY_SCALE_DESCRIPTION,
+  DEPENDENCY_SCALE_LABELS,
+  FUNDING_ROLE_LABELS,
+  INTERVIEW_STATUS_DESCRIPTIONS,
+  RELATIONSHIP_STYLE,
+  WILLINGNESS_SCALE_DESCRIPTION,
+  WILLINGNESS_SCALE_LABELS,
+} from './constants'
 
 interface NodeDetailPanelProps {
   node: GraphNode
@@ -24,6 +32,11 @@ export default function NodeDetailPanel({
   const showSaved = lastSavedAt != null
   const related = edges.filter((e) => e.source === node.id || e.target === node.id)
   const displayNotes = notes || node.notes
+  const fundingRole = FUNDING_ROLE_LABELS[node.funding_role]
+  const dependencyLabel = DEPENDENCY_SCALE_LABELS[node.dependency_score] ?? node.dependency_score
+  const willingnessLabel =
+    WILLINGNESS_SCALE_LABELS[node.willingness_score] ?? node.willingness_score
+  const interviewDesc = INTERVIEW_STATUS_DESCRIPTIONS[node.interview_status]
 
   return (
     <div className="node-detail-panel">
@@ -36,27 +49,63 @@ export default function NodeDetailPanel({
           </button>
         </div>
       </div>
-      <dl className="node-detail-meta">
-        <dt>Category</dt>
-        <dd>{CATEGORY_LABELS[node.category]}</dd>
-        <dt>Location</dt>
-        <dd>{node.location}</dd>
-        <dt>Funding role</dt>
-        <dd>{node.funding_role}</dd>
-        <dt>Dependency (1–5)</dt>
-        <dd>{node.dependency_score}</dd>
-        <dt>Willingness to pay (1–5)</dt>
-        <dd>{node.willingness_score}</dd>
-        <dt>Interview status</dt>
-        <dd>{node.interview_status.replace(/_/g, ' ')}</dd>
-        <dt>Annual funding (USD)</dt>
-        <dd>{node.annual_funding_USD > 0 ? node.annual_funding_USD.toLocaleString() : '—'}</dd>
-      </dl>
+
+      <section className="node-detail-section">
+        <h3 className="node-detail-section-title">Who they are</h3>
+        <dl className="node-detail-meta">
+          <dt>Category</dt>
+          <dd>{CATEGORY_LABELS[node.category]}</dd>
+          <dt>Location</dt>
+          <dd>{node.location}</dd>
+          <dt>Funding role</dt>
+          <dd>
+            <span className="node-detail-label">{fundingRole.label}</span>
+            <p className="node-detail-hint">{fundingRole.description}</p>
+          </dd>
+        </dl>
+      </section>
+
+      <section className="node-detail-section">
+        <h3 className="node-detail-section-title">Reef relevance</h3>
+        <dl className="node-detail-meta">
+          <dt>Dependency on reefs</dt>
+          <dd>
+            <span className="node-detail-score">
+              {node.dependency_score}/5 — {dependencyLabel}
+            </span>
+            <p className="node-detail-hint">{DEPENDENCY_SCALE_DESCRIPTION}</p>
+          </dd>
+          <dt>Willingness to pay for reef protection</dt>
+          <dd>
+            <span className="node-detail-score">
+              {node.willingness_score}/5 — {willingnessLabel}
+            </span>
+            <p className="node-detail-hint">{WILLINGNESS_SCALE_DESCRIPTION}</p>
+          </dd>
+        </dl>
+      </section>
+
+      <section className="node-detail-section">
+        <h3 className="node-detail-section-title">Research</h3>
+        <dl className="node-detail-meta">
+          <dt>Interview status</dt>
+          <dd>
+            <span className="node-detail-label">{node.interview_status.replace(/_/g, ' ')}</span>
+            <p className="node-detail-hint">{interviewDesc}</p>
+          </dd>
+          <dt>Annual funding (USD)</dt>
+          <dd>{node.annual_funding_USD > 0 ? node.annual_funding_USD.toLocaleString() : '—'}</dd>
+        </dl>
+      </section>
+
       {node.key_quote && (
-        <blockquote className="node-detail-quote">{node.key_quote}</blockquote>
+        <section className="node-detail-section">
+          <h3 className="node-detail-section-title">In their words</h3>
+          <blockquote className="node-detail-quote">{node.key_quote}</blockquote>
+        </section>
       )}
       <section className="node-detail-edges">
-        <h3>Relationships</h3>
+        <h3 className="node-detail-section-title">Relationships</h3>
         <ul>
           {related.map((e) => {
             const other = e.source === node.id ? e.target : e.source

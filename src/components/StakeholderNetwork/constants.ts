@@ -1,4 +1,4 @@
-import type { ActorCategory, InterviewStatus, RelationshipType } from '@/types/graph'
+import type { ActorCategory, FundingRole, InterviewStatus, RelationshipType } from '@/types/graph'
 
 export const CATEGORY_COLORS: Record<ActorCategory, string> = {
   restoration_operator: '#007B6E',
@@ -37,4 +37,54 @@ export const RELATIONSHIP_STYLE: Record<
   regulation: { stroke: '#0A1E3A', strokeDasharray: 'none', strokeWidth: 1 },
   degradation: { stroke: '#C2410C', strokeDasharray: '3 4', strokeWidth: 1.5 },
   proposed: { stroke: '#94a3b8', strokeDasharray: '8 4', strokeWidth: 1 },
+}
+
+/** 1–5: How much this actor's livelihood or operations depend on reef health. */
+export const DEPENDENCY_SCALE_LABELS: Record<number, string> = {
+  1: 'Low',
+  2: 'Some',
+  3: 'Moderate',
+  4: 'High',
+  5: 'Critical',
+}
+export const DEPENDENCY_SCALE_DESCRIPTION =
+  'How much this actor’s livelihood or operations depend on reef health.'
+
+/** 0–5: Willingness to pay or contribute to reef protection. */
+export const WILLINGNESS_SCALE_LABELS: Record<number, string> = {
+  0: 'None',
+  1: 'Low',
+  2: 'Some',
+  3: 'Moderate',
+  4: 'High',
+  5: 'High',
+}
+export const WILLINGNESS_SCALE_DESCRIPTION =
+  'Willingness to pay or contribute to reef protection and recovery.'
+
+export const FUNDING_ROLE_LABELS: Record<FundingRole, { label: string; description: string }> = {
+  funder: { label: 'Funder', description: 'Provides funding for reef protection or restoration.' },
+  beneficiary: {
+    label: 'Beneficiary',
+    description: 'Benefits from reef (e.g. tourism, fisheries, ecosystem services).',
+  },
+  operator: {
+    label: 'Operator',
+    description: 'Runs restoration, conservation, or related operations.',
+  },
+  regulator: {
+    label: 'Regulator',
+    description: 'Sets rules, enforcement, or policy affecting reefs.',
+  },
+  both: {
+    label: 'Funder & beneficiary',
+    description: 'Both provides funding and receives benefit from reef health.',
+  },
+}
+
+export const INTERVIEW_STATUS_DESCRIPTIONS: Record<InterviewStatus, string> = {
+  target: 'Planned for interview.',
+  confirmed: 'Interview scheduled.',
+  completed: 'Interview completed.',
+  not_pursued: 'Not interviewing.',
 }

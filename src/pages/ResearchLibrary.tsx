@@ -100,39 +100,72 @@ export default function ResearchLibrary() {
       </div>
       {tab === 'documents' && (
         <ul className="library-list documents-list">
-          {filteredDocs.map((doc) => (
-            <li key={doc.id} className="library-card">
-              <h3>{doc.title}</h3>
-              <p className="library-description">{doc.description}</p>
-              <div className="library-meta">
-                <span className="library-source">{doc.source}</span>
-                {doc.topic && <span className="library-topic">{doc.topic}</span>}
-              </div>
-              {doc.link && (
-                <a href={doc.link} target="_blank" rel="noopener noreferrer" className="library-link">
-                  Open
+          {filteredDocs.map((doc) =>
+            doc.link ? (
+              <li key={doc.id}>
+                <a
+                  href={encodeURI(doc.link)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="library-card library-card-link"
+                >
+                  <h3>{doc.title}</h3>
+                  <p className="library-description">{doc.description}</p>
+                  <div className="library-meta">
+                    <span className="library-source">{doc.source}</span>
+                    {doc.topic && <span className="library-topic">{doc.topic}</span>}
+                  </div>
+                  <span className="library-link">Open document →</span>
                 </a>
-              )}
-            </li>
-          ))}
+              </li>
+            ) : (
+              <li key={doc.id} className="library-card library-card-no-link">
+                <h3>{doc.title}</h3>
+                <p className="library-description">{doc.description}</p>
+                <div className="library-meta">
+                  <span className="library-source">{doc.source}</span>
+                  {doc.topic && <span className="library-topic">{doc.topic}</span>}
+                </div>
+                <p className="library-no-link">
+                  No link yet — add a <code>link</code> in the data to open this document.
+                </p>
+              </li>
+            )
+          )}
         </ul>
       )}
       {tab === 'readings' && (
         <ul className="library-list readings-list">
-          {filteredReadings.map((r) => (
-            <li key={r.id} className="library-card">
-              <h3>{r.title}</h3>
-              <div className="library-meta">
-                <span className="library-topic">{r.topic}</span>
-                <span className="library-source">{r.source}</span>
-              </div>
-              {r.link && (
-                <a href={r.link} target="_blank" rel="noopener noreferrer" className="library-link">
-                  Open
+          {filteredReadings.map((r) =>
+            r.link ? (
+              <li key={r.id}>
+                <a
+                  href={encodeURI(r.link)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="library-card library-card-link"
+                >
+                  <h3>{r.title}</h3>
+                  <div className="library-meta">
+                    <span className="library-topic">{r.topic}</span>
+                    <span className="library-source">{r.source}</span>
+                  </div>
+                  <span className="library-link">Open reading →</span>
                 </a>
-              )}
-            </li>
-          ))}
+              </li>
+            ) : (
+              <li key={r.id} className="library-card library-card-no-link">
+                <h3>{r.title}</h3>
+                <div className="library-meta">
+                  <span className="library-topic">{r.topic}</span>
+                  <span className="library-source">{r.source}</span>
+                </div>
+                <p className="library-no-link">
+                  No link yet — add a <code>link</code> in the data to open this reading.
+                </p>
+              </li>
+            )
+          )}
         </ul>
       )}
       {tab === 'recordings' && (

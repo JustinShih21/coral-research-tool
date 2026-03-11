@@ -7,6 +7,7 @@ export const libraryDocuments: LibraryDocument[] = [
     description: 'Trip memo from Bali field research on coral restoration.',
     source: 'Trip Notes',
     topic: 'Field research',
+    link: '/Coral Farming/Trip Notes/BUAD493 Coral Restoration Bali Memo.docx',
   },
   {
     id: 'coral-research-doc',
@@ -14,6 +15,7 @@ export const libraryDocuments: LibraryDocument[] = [
     description: 'Primary project overview and research document.',
     source: 'Coral Farming',
     topic: 'Overview',
+    link: '/Coral Farming/Coral Reserach.docx',
   },
   {
     id: '2026-coral-team',
@@ -21,6 +23,7 @@ export const libraryDocuments: LibraryDocument[] = [
     description: '2026 coral team planning and roles.',
     source: 'New 2026',
     topic: 'Planning',
+    link: '/Coral Farming/New 2026/2026 Coral Team.docx',
   },
   {
     id: 'ocean-health-brief',
@@ -28,6 +31,7 @@ export const libraryDocuments: LibraryDocument[] = [
     description: 'Brief on coral restoration and ocean health.',
     source: 'New 2026',
     topic: 'Policy / brief',
+    link: '/Coral Farming/New 2026/Coral Restoration _ Ocean Health Brief.docx',
   },
   {
     id: 'value-of-coral-notes',
@@ -35,6 +39,7 @@ export const libraryDocuments: LibraryDocument[] = [
     description: 'Notes on valuing coral reefs and ecosystem services.',
     source: 'Secondary Research',
     topic: 'Valuation',
+    link: '/Coral Farming/Secondary Research/Value of Coral Notes.docx',
   },
   {
     id: 'leon-boey-follow-up',
@@ -42,6 +47,7 @@ export const libraryDocuments: LibraryDocument[] = [
     description: 'Post-trip follow-up notes with Leon Boey (Living Seas).',
     source: 'Post Trip Research',
     topic: 'Stakeholder',
+    link: '/Coral Farming/Post Trip Research/Leon Boey Follow Up.docx',
   },
   {
     id: 'restoration-plan-post-trip',
@@ -49,6 +55,7 @@ export const libraryDocuments: LibraryDocument[] = [
     description: 'Restoration plan and next steps after field trip.',
     source: 'Post Trip Research',
     topic: 'Planning',
+    link: '/Coral Farming/Post Trip Research/Coral Restoration plan post-trip.docx',
   },
   {
     id: 'memo-1',
@@ -56,6 +63,7 @@ export const libraryDocuments: LibraryDocument[] = [
     description: 'Post-trip memo from field research.',
     source: 'Post Trip Research',
     topic: 'Field research',
+    link: '/Coral Farming/Post Trip Research/Memo #1.docx',
   },
   {
     id: 'honors-capital-reefs',
@@ -63,6 +71,7 @@ export const libraryDocuments: LibraryDocument[] = [
     description: 'Honors thesis / report on capital and reef financing.',
     source: 'Final 494 Reports',
     topic: 'Finance',
+    link: '/Coral Farming/Final 494 Reports/Honors-Capital Reefs.pdf',
   },
   {
     id: 'riley-pierce-final',
@@ -70,6 +79,7 @@ export const libraryDocuments: LibraryDocument[] = [
     description: 'BUAD494 final report by Riley Pierce.',
     source: 'Final 494 Reports',
     topic: 'Report',
+    link: '/Coral Farming/Final 494 Reports/FINAL Report - Riley Pierce.docx',
   },
   {
     id: 'marina-parker-494',
@@ -77,6 +87,7 @@ export const libraryDocuments: LibraryDocument[] = [
     description: 'BUAD494 coral research final report by Marina Parker.',
     source: 'Final 494 Reports',
     topic: 'Report',
+    link: '/Coral Farming/Final 494 Reports/Marina Parker BUAD494 Coral Final.docx',
   },
   {
     id: 'final-report-493',
@@ -84,6 +95,7 @@ export const libraryDocuments: LibraryDocument[] = [
     description: 'BUAD493 final report on coral restoration research.',
     source: '493 Reports',
     topic: 'Report',
+    link: '/Coral Farming/493 Reports/Final Report BUAD493 Coral.docx',
   },
   {
     id: 'coral-triangle-notes',
@@ -91,6 +103,7 @@ export const libraryDocuments: LibraryDocument[] = [
     description: 'Interview and research notes from Coral Triangle Conservancy.',
     source: 'Trip Notes / Interviews',
     topic: 'Stakeholder',
+    link: '/Coral Farming/Trip Notes/Interviews/Coral Triangle Conservancy Notes.docx',
   },
   {
     id: 'usc-interview-notes',
@@ -98,6 +111,7 @@ export const libraryDocuments: LibraryDocument[] = [
     description: 'Notes from USC coral research interviews.',
     source: 'Trip Notes / Interviews',
     topic: 'Stakeholder',
+    link: '/Coral Farming/Trip Notes/Interviews/USC Coral Research Interview Notes.docx',
   },
   {
     id: 'dr-shelton-notes',
@@ -105,6 +119,7 @@ export const libraryDocuments: LibraryDocument[] = [
     description: 'Notes from interview with Dr Shelton.',
     source: 'Trip Notes / Interviews',
     topic: 'Stakeholder',
+    link: '/Coral Farming/Trip Notes/Interviews/Dr Shelton Notes.docx',
   },
   {
     id: 'email-templates',
@@ -112,27 +127,28 @@ export const libraryDocuments: LibraryDocument[] = [
     description: 'Templates for stakeholder and partner outreach.',
     source: 'New 2026',
     topic: 'Outreach',
+    link: '/Coral Farming/New 2026/Email Outreach Templates.docx',
   },
 ]
 
 export const libraryReadings: LibraryReading[] = [
-  { id: 'climate-finance-readings', title: 'Climate Finance Readings', topic: 'Climate finance', source: 'New 2026 / Climate Finance Readings' },
-  { id: 'em-market-2026', title: 'EM Market Insights Brief 2026 Q1', topic: 'Climate finance', source: 'New 2026 / Climate Finance Readings' },
-  { id: 'nitrogen-pollution-2021', title: 'Impacts of nitrogen pollution on corals (STOTEn 2021)', topic: 'Nitrogen / bleaching', source: 'Secondary Research / Articles' },
-  { id: 'nitrogen-identity-2019', title: 'Nitrogen identity and coral bleaching (Ecosystems 2019)', topic: 'Nitrogen / bleaching', source: 'Secondary Research / Articles' },
-  { id: 'nitrate-ammonium-2020', title: 'Unravelling nitrate and ammonium effects on coral bleaching (Science Reports 2020)', topic: 'Nitrogen / bleaching', source: 'Secondary Research / Articles' },
-  { id: 'pnas-2020-nitrogen', title: 'Nitrogen pollution and heat stress (PNAS 2020)', topic: 'Nitrogen / bleaching', source: 'Secondary Research / Articles' },
-  { id: 'zooxanthellae-1999', title: 'Dynamics of zooxanthellae populations (Science 1999)', topic: 'Biology', source: 'Secondary Research / Articles' },
-  { id: 'groundwater-nitrogen-2002', title: 'Ground water nitrogen discharge into coral reefs (Coral Reefs 2002)', topic: 'Nitrogen', source: 'Secondary Research / Articles' },
-  { id: 'nutrient-resources-1989', title: 'External nutrient resources and zooxanthellae (Proc Roy Soc 1989)', topic: 'Biology', source: 'Secondary Research / Articles' },
-  { id: 'temperature-hypoxia-2004', title: 'Effect of temperature, hypoxia, ammonia, nitrate on bleaching (Chinese Science Bull 2004)', topic: 'Bleaching', source: 'Secondary Research / Articles' },
-  { id: 'nutrient-enrichment-2002', title: 'Nutrient enrichment on coral reefs (Estuaries 2002)', topic: 'Nutrients', source: 'Secondary Research / Articles' },
-  { id: 'brooding-coral-larvae', title: 'Creating stocks from brooding coral larvae for restoration', topic: 'Restoration', source: 'Secondary Research / Articles' },
-  { id: 'robotic-reef-monitoring', title: 'Systematic review of robotic efficacy in reef monitoring', topic: 'Monitoring', source: 'Secondary Research / Articles' },
-  { id: 'synergistic-nitrate-2023', title: 'Synergistic/antagonistic effects of nitrate/ammonium (Science of the Total Environ 2023)', topic: 'Nitrogen / bleaching', source: 'Secondary Research / Articles' },
-  { id: 'huang-2025-nitrogen', title: 'Nitrogen source type and heat stress in coral symbiont (2025)', topic: 'Nitrogen / biology', source: 'Secondary Research / Articles' },
-  { id: 'resilience-rodrigues', title: 'From risk to resilience: coastal flooding Rodrigues Island', topic: 'Adaptation', source: 'Secondary Research / Articles' },
-  { id: 'landscape-saint-martin', title: 'Landscape transition and ecological risk (Saint Martin Island, Bangladesh)', topic: 'Monitoring / risk', source: 'Secondary Research / Articles' },
+  { id: 'climate-finance-readings', title: 'Climate Finance Readings', topic: 'Climate finance', source: 'New 2026 / Climate Finance Readings', link: '/Coral Farming/New 2026/Climate Finance Readings/Climate Finance Readings.docx' },
+  { id: 'em-market-2026', title: 'EM Market Insights Brief 2026 Q1', topic: 'Climate finance', source: 'New 2026 / Climate Finance Readings', link: '/Coral Farming/New 2026/Climate Finance Readings/EM Market Insights Brief_2026-Q1.pdf' },
+  { id: 'nitrogen-pollution-2021', title: 'Impacts of nitrogen pollution on corals (STOTEn 2021)', topic: 'Nitrogen / bleaching', source: 'Secondary Research / Articles', link: '/Coral Farming/Secondary Research/Articles /STOTEn (2021) Impacts of nitrogen pollution on corals in the context of global climate change and conservation strategies.pdf' },
+  { id: 'nitrogen-identity-2019', title: 'Nitrogen identity and coral bleaching (Ecosystems 2019)', topic: 'Nitrogen / bleaching', source: 'Secondary Research / Articles', link: '/Coral Farming/Secondary Research/Articles /Ecosystems (2019) Nitrogen identity drives differential impacts of nutrients on coral bleaching and mortality.pdf' },
+  { id: 'nitrate-ammonium-2020', title: 'Unravelling nitrate and ammonium effects on coral bleaching (Science Reports 2020)', topic: 'Nitrogen / bleaching', source: 'Secondary Research / Articles', link: '/Coral Farming/Secondary Research/Articles /Science Reports (2020) Unravelling the different causes of nitrate and ammonium effects on coral bleaching.pdf' },
+  { id: 'pnas-2020-nitrogen', title: 'Nitrogen pollution and heat stress (PNAS 2020)', topic: 'Nitrogen / bleaching', source: 'Secondary Research / Articles', link: '/Coral Farming/Secondary Research/Articles /PNAS (2020) nitrogen-pollution-interacts-with-heat-stress-to-increase-coral-bleaching-across-the-seascape.pdf' },
+  { id: 'zooxanthellae-1999', title: 'Dynamics of zooxanthellae populations (Science 1999)', topic: 'Biology', source: 'Secondary Research / Articles', link: '/Coral Farming/Secondary Research/Articles /Science (1999) The dynamics of zooxanthellae populations a long-term study in the field.pdf' },
+  { id: 'groundwater-nitrogen-2002', title: 'Ground water nitrogen discharge into coral reefs (Coral Reefs 2002)', topic: 'Nitrogen', source: 'Secondary Research / Articles', link: '/Coral Farming/Secondary Research/Articles /Coral Reefs (2002) Significance of gournd water nitrogen discharge into coral reefs in Japan.pdf' },
+  { id: 'nutrient-resources-1989', title: 'External nutrient resources and zooxanthellae (Proc Roy Soc 1989)', topic: 'Biology', source: 'Secondary Research / Articles', link: '/Coral Farming/Secondary Research/Articles /Proc Roy Soc (1989) The effect of external nutrient resources on the population dynamics of zoocanthellae in reef coral.pdf' },
+  { id: 'temperature-hypoxia-2004', title: 'Effect of temperature, hypoxia, ammonia, nitrate on bleaching (Chinese Science Bull 2004)', topic: 'Bleaching', source: 'Secondary Research / Articles', link: '/Coral Farming/Secondary Research/Articles /Chinese Science Bull (2004) Effect of temperature hypoxia ammonia and nitrate on the bleaching among 3 coral species(1).pdf' },
+  { id: 'nutrient-enrichment-2002', title: 'Nutrient enrichment on coral reefs (Estuaries 2002)', topic: 'Nutrients', source: 'Secondary Research / Articles', link: '/Coral Farming/Secondary Research/Articles /Estuaries (2002) Nutrient enrichment on coral reefs is it a major cause of coral reef decline.pdf' },
+  { id: 'brooding-coral-larvae', title: 'Creating stocks from brooding coral larvae for restoration', topic: 'Restoration', source: 'Secondary Research / Articles', link: '/Coral Farming/Secondary Research/Articles /Creating stocks of young colonies from brooding coral larvae, amenable to active reef restoration.pdf' },
+  { id: 'robotic-reef-monitoring', title: 'Systematic review of robotic efficacy in reef monitoring', topic: 'Monitoring', source: 'Secondary Research / Articles', link: '/Coral Farming/Secondary Research/Articles /A systematic review of robotic efficacy in coral reef monitoring techniques.pdf' },
+  { id: 'synergistic-nitrate-2023', title: 'Synergistic/antagonistic effects of nitrate/ammonium (Science of the Total Environ 2023)', topic: 'Nitrogen / bleaching', source: 'Secondary Research / Articles', link: '/Coral Farming/Secondary Research/Articles /Science of the Total Environ [2023] Synergistic_antagonistic effects of nitrate_ammonium on FA biosynthesis transloc coral heat stress.pdf' },
+  { id: 'huang-2025-nitrogen', title: 'Nitrogen source type and heat stress in coral symbiont (2025)', topic: 'Nitrogen / biology', source: 'Secondary Research / Articles', link: '/Coral Farming/Secondary Research/Articles /huang-et-al-2025-nitrogen-source-type-modulates-heat-stress-response-in-coral-symbiont-(cladocopium-goreaui).pdf' },
+  { id: 'resilience-rodrigues', title: 'From risk to resilience: coastal flooding Rodrigues Island', topic: 'Adaptation', source: 'Secondary Research / Articles', link: '/Coral Farming/Secondary Research/Articles /From risk to resilience- geospatial decision support tool and adaptation strategies for coastal flooding in Rodrigues Island.pdf' },
+  { id: 'landscape-saint-martin', title: 'Landscape transition and ecological risk (Saint Martin Island, Bangladesh)', topic: 'Monitoring / risk', source: 'Secondary Research / Articles', link: '/Coral Farming/Secondary Research/Articles /Landscape transition‑induced ecological risk modeling using GIS and remote sensing techniques- a case of Saint Martin Island, Bangladesh.pdf' },
 ]
 
 export const libraryRecordings: LibraryRecording[] = [
