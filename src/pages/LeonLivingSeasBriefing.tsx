@@ -1,19 +1,63 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   leonProfile,
   leonInsights,
   operatingSignals,
   interviewGoals,
-  interviewSections,
+  interviewSections as baseInterviewSections,
   toolConcepts,
   leonSourceFiles,
   type ToolConcept,
+  type InterviewSection,
+  type InterviewQuestion,
 } from '@/data/leonLivingSeas'
 import { useAuth } from '@/contexts/AuthContext'
 import { getResearchData, setResearchData } from '@/lib/researchStorage'
 
 const STORAGE_KEY = 'coral-leon-briefing'
+const LEON_ADDITIONS_KEY = 'leon-interview-additions'
+const LEON_DELETED_IDS_KEY = 'leon-interview-deleted-ids'
 const SAVED_INDICATOR_MS = 2000
+
+function parseLeonSections(value: unknown): InterviewSection[] {
+  if (!Array.isArray(value)) return []
+  return value.filter(
+    (s): s is InterviewSection =>
+      s != null &&
+      typeof s === 'object' &&
+      typeof (s as InterviewSection).id === 'string' &&
+      typeof (s as InterviewSection).title === 'string' &&
+      Array.isArray((s as InterviewSection).questions)
+  )
+}
+
+function parseLeonDeletedIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value.filter((id): id is string => typeof id === 'string')
+}
+
+function mergeLeonSections(
+  base: InterviewSection[],
+  additions: InterviewSection[],
+  deletedIds: string[]
+): InterviewSection[] {
+  const deletedSet = new Set(deletedIds)
+  const result: InterviewSection[] = []
+  for (const section of base) {
+    const filteredQuestions = section.questions.filter((q) => !deletedSet.has(q.id))
+    const extraQuestions = additions
+      .filter((a) => a.id === section.id)
+      .flatMap((a) => a.questions)
+    result.push({
+      ...section,
+      questions: [...filteredQuestions, ...extraQuestions],
+    })
+  }
+  for (const addSection of additions) {
+    if (!base.some((s) => s.id === addSection.id)) result.push(addSection)
+  }
+  return result
+}
 
 type Tab = 'briefing' | 'interview' | 'tools'
 type ToolFilter = 'all' | ToolConcept['stage']
@@ -34,6 +78,8 @@ export default function LeonLivingSeasBriefing() {
   const [tab, setTab] = useState<Tab>('briefing')
   const [toolFilter, setToolFilter] = useState<ToolFilter>('all')
   const [search, setSearch] = useState('')
+  const [leonAdditions, setLeonAdditions] = useState<InterviewSection[]>([])
+  const [leonDeletedIds, setLeonDeletedIds] = useState<string[]>([])
   const [checkedQuestions, setCheckedQuestions] = useState<Record<string, boolean>>({})
   const [questionNotes, setQuestionNotes] = useState<Record<string, string>>({})
   const [meetingNotes, setMeetingNotes] = useState('')
@@ -42,6 +88,21 @@ export default function LeonLivingSeasBriefing() {
   const [saveStatus, setSaveStatus] = useState<'cloud' | 'local' | null>(null)
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isInitialMount = useRef(true)
+
+  useEffect(() => {
+    Promise.all([
+      getResearchData<unknown>(LEON_ADDITIONS_KEY),
+      getResearchData<unknown>(LEON_DELETED_IDS_KEY),
+    ]).then(([addData, delData]) => {
+      setLeonAdditions(parseLeonSections(addData))
+      setLeonDeletedIds(parseLeonDeletedIds(delData))
+    })
+  }, [])
+
+  const displaySections = useMemo(
+    () => mergeLeonSections(baseInterviewSections, leonAdditions, leonDeletedIds),
+    [leonAdditions, leonDeletedIds]
+  )
 
   useEffect(() => {
     getResearchData<SavedState>(STORAGE_KEY).then((data) => {
@@ -77,13 +138,13 @@ export default function LeonLivingSeasBriefing() {
     }
   }, [checkedQuestions, questionNotes, meetingNotes, user])
 
-  const totalQuestions = interviewSections.reduce((sum, section) => sum + section.questions.length, 0)
+  const totalQuestions = displaySections.reduce((sum, section) => sum + section.questions.length, 0)
   const doneQuestions = Object.values(checkedQuestions).filter(Boolean).length
 
   const filteredSections = useMemo(() => {
     const query = search.trim().toLowerCase()
-    if (!query) return interviewSections
-    return interviewSections
+    if (!query) return displaySections
+    return displaySections
       .map((section) => ({
         ...section,
         questions: section.questions.filter(
@@ -93,7 +154,42 @@ export default function LeonLivingSeasBriefing() {
         ),
       }))
       .filter((section) => section.questions.length > 0)
-  }, [search])
+  }, [search, displaySections])
+
+  const addLeonQuestion = useCallback(
+    (sectionId: string, sectionTitle: string, text: string, whyItMatters: string) => {
+      const newId = 'leon-custom-' + Date.now()
+      const newQ: InterviewQuestion = { id: newId, text, whyItMatters: whyItMatters || 'Custom question.' }
+      const next = [...leonAdditions]
+      const idx = next.findIndex((s) => s.id === sectionId)
+      if (idx >= 0) {
+        next[idx] = { ...next[idx], questions: [...next[idx].questions, newQ] }
+      } else {
+        next.push({ id: sectionId, title: sectionTitle, questions: [newQ] })
+      }
+      setLeonAdditions(next)
+      setResearchData(LEON_ADDITIONS_KEY, next)
+    },
+    [leonAdditions]
+  )
+
+  const deleteLeonQuestion = useCallback(
+    (questionId: string) => {
+      const inAdditions = leonAdditions.some((s) => s.questions.some((q) => q.id === questionId))
+      if (inAdditions) {
+        const next = leonAdditions
+          .map((s) => ({ ...s, questions: s.questions.filter((q) => q.id !== questionId) }))
+          .filter((s) => s.questions.length > 0)
+        setLeonAdditions(next)
+        setResearchData(LEON_ADDITIONS_KEY, next)
+      } else {
+        const next = [...leonDeletedIds, questionId]
+        setLeonDeletedIds(next)
+        setResearchData(LEON_DELETED_IDS_KEY, next)
+      }
+    },
+    [leonAdditions, leonDeletedIds]
+  )
 
   const filteredTools = useMemo(() => {
     if (toolFilter === 'all') return toolConcepts
@@ -249,12 +345,30 @@ export default function LeonLivingSeasBriefing() {
                             [question.id]: e.target.value,
                           }))
                         }
-                        placeholder="Interview notes for this question..."
+                        placeholder={user ? 'Interview notes for this question...' : 'Log in to save notes'}
+                        readOnly={!user}
                         rows={2}
                       />
+                      {user && (
+                        <button
+                          type="button"
+                          className="leon-question-delete"
+                          onClick={() => deleteLeonQuestion(question.id)}
+                          title="Remove question"
+                        >
+                          Remove question
+                        </button>
+                      )}
                     </li>
                   ))}
                 </ul>
+                {user && (
+                  <LeonAddQuestionForm
+                    sectionId={section.id}
+                    sectionTitle={section.title}
+                    onAdd={addLeonQuestion}
+                  />
+                )}
               </article>
             ))}
             {filteredSections.length === 0 && (
@@ -341,5 +455,48 @@ export default function LeonLivingSeasBriefing() {
         </section>
       )}
     </div>
+  )
+}
+
+function LeonAddQuestionForm({
+  sectionId,
+  sectionTitle,
+  onAdd,
+}: {
+  sectionId: string
+  sectionTitle: string
+  onAdd: (sectionId: string, sectionTitle: string, text: string, whyItMatters: string) => void
+}) {
+  const [text, setText] = useState('')
+  const [whyItMatters, setWhyItMatters] = useState('')
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!text.trim()) return
+    onAdd(sectionId, sectionTitle, text.trim(), whyItMatters.trim())
+    setText('')
+    setWhyItMatters('')
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="leon-add-question">
+      <label>
+        Add question
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="New question text…"
+        />
+      </label>
+      <label>
+        Why it matters <span className="leon-add-optional">(optional)</span>
+        <input
+          value={whyItMatters}
+          onChange={(e) => setWhyItMatters(e.target.value)}
+          placeholder="Why this question matters…"
+        />
+      </label>
+      <button type="submit">Add</button>
+    </form>
   )
 }
