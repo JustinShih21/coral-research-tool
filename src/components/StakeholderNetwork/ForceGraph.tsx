@@ -208,7 +208,7 @@ const ForceGraph = forwardRef<ForceGraphHandle, ForceGraphProps>(function ForceG
     const label = g.append('g').attr('class', 'labels')
       .selectAll<SVGTextElement, D3Node>('text').data(d3Nodes).join('text')
       .text((d) => d.name)
-      .attr('font-size', 11.5)
+      .attr('font-size', 10.5)
       .attr('font-family', 'DM Sans, system-ui, sans-serif')
       .attr('font-weight', '500')
       .attr('fill', '#c8e6f5')
@@ -218,7 +218,7 @@ const ForceGraph = forwardRef<ForceGraphHandle, ForceGraphProps>(function ForceG
       .attr('stroke-linejoin', 'round')
       .attr('dx', (d) => radiusFromNode(d) + 7)
       .attr('dy', 4)
-      .attr('opacity', 0)               // Hidden until hover / selection
+      .attr('opacity', 0.55)             // Dimly visible by default
       .style('pointer-events', 'none')
 
     // ── Tooltip ───────────────────────────────────────────────────────
@@ -246,11 +246,11 @@ const ForceGraph = forwardRef<ForceGraphHandle, ForceGraphProps>(function ForceG
       })
       .on('mousemove', (e) => tip.style('top', `${(e as MouseEvent).pageY + 14}px`).style('left', `${(e as MouseEvent).pageX + 14}px`))
       .on('mouseout', (_ev, d) => {
-        // Hide label again unless it's selected or on an active path
+        // Revert label to resting opacity unless selected or on path
         const isSelected = selectedIdRef.current === d.id
         const isOnPath = pathNodeIds.size > 0 && pathNodeIds.has(d.id)
         if (!isSelected && !isOnPath) {
-          label.filter((ld) => ld.id === d.id).attr('opacity', 0)
+          label.filter((ld) => ld.id === d.id).attr('opacity', 0.55)
         }
         tip.style('visibility', 'hidden')
       })
@@ -323,12 +323,12 @@ const ForceGraph = forwardRef<ForceGraphHandle, ForceGraphProps>(function ForceG
     svg.selectAll<SVGTextElement, D3Node>('.node-abbrevs text')
       .attr('opacity', (d) => pathNodeIds.size === 0 || pathNodeIds.has(d.id) ? 0.82 : 0.2)
 
-    // Labels: visible only for selected node + path nodes
+    // Labels: full opacity for selected/path nodes, dimmed otherwise
     svg.selectAll<SVGTextElement, D3Node>('.labels text')
       .attr('opacity', (d) => {
         if (selectedNodeId === d.id) return 1
-        if (pathNodeIds.size > 0 && pathNodeIds.has(d.id)) return 1
-        return 0
+        if (pathNodeIds.size > 0) return pathNodeIds.has(d.id) ? 1 : 0.12
+        return 0.55
       })
       .attr('fill', (d) => selectedNodeId === d.id ? '#ffffff' : '#c8e6f5')
   }, [pathNodeIds, pathEdgeIds, selectedNodeId])

@@ -1,7 +1,7 @@
 import type { GraphNode, GraphEdge } from '@/types/graph'
+import CategoryIcon from './CategoryIcon'
 import {
   CATEGORY_COLORS,
-  CATEGORY_ICONS,
   CATEGORY_LABELS,
   DEPENDENCY_SCALE_LABELS,
   FUNDING_ROLE_LABELS,
@@ -69,7 +69,7 @@ export default function NodeDetailPanel({
       <div className="ndp-header" style={{ borderTopColor: catColor }}>
         <div className="ndp-header-top">
           <span className="ndp-category-badge" style={{ background: `${catColor}1a`, color: catColor }}>
-            <span className="ndp-category-icon">{CATEGORY_ICONS[node.category]}</span>
+            <CategoryIcon category={node.category} size={12} color={catColor} strokeWidth={2.5} />
             {CATEGORY_LABELS[node.category]}
           </span>
           <button type="button" className="ndp-close" onClick={onClose} aria-label="Close">
