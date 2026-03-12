@@ -11,6 +11,8 @@ import {
 } from '@/data/researchFramework'
 import { useAuth } from '@/contexts/AuthContext'
 import { getResearchData, setResearchData, RESEARCH_KEYS } from '@/lib/researchStorage'
+import Hero from '@/components/Hero'
+import { HERO_IMAGE } from '@/data/imageAssets'
 
 const CURRENT_PHASE_ID = 1
 
@@ -106,10 +108,12 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard">
-      <h1>Research Program Dashboard</h1>
-      <p className="dashboard-intro">
-        Indonesia Coral Reef Financing Research - mission, core framework, and execution phases.
-      </p>
+      <Hero
+        imageUrl={HERO_IMAGE}
+        imageAlt="Coral reef and ocean"
+        title="Research Program Dashboard"
+        subtitle="Indonesia Coral Reef Financing Research — mission, core framework, and execution phases."
+      />
       <section className="dashboard-panel">
         <h2>Project Mission</h2>
         {projectMission.map((statement) => (

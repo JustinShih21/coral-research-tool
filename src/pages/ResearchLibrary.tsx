@@ -3,6 +3,7 @@ import { libraryDocuments, libraryReadings, libraryRecordings } from '@/data/res
 import { useAuth } from '@/contexts/AuthContext'
 import { getResearchData, setResearchData } from '@/lib/researchStorage'
 import type { LibraryDocument } from '@/types/library'
+import { LIBRARY_IMAGE } from '@/data/imageAssets'
 
 const LIBRARY_EXTRA_KEY = 'library-documents-extra'
 
@@ -89,9 +90,23 @@ export default function ResearchLibrary() {
 
   return (
     <div className="research-library">
-      <h1>Research Library</h1>
+      <header className="library-header">
+        <div
+          className="library-header-bg"
+          style={{ backgroundImage: `url(${LIBRARY_IMAGE})` }}
+          role="img"
+          aria-label="Research and coral reef"
+        />
+        <span className="library-header-overlay" aria-hidden />
+        <div className="library-header-content">
+          <h1>Research Library</h1>
+          <p className="library-header-intro">
+            Documents, readings, and recordings from the Coral Farming archive.
+          </p>
+        </div>
+      </header>
       <p className="library-intro">
-        Documents, readings, and recordings from the Coral Farming archive. Add links when files are hosted to enable direct access or playback.
+        Add links when files are hosted to enable direct access or playback.
       </p>
       <div className="library-tabs">
         <button

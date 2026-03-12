@@ -7,4 +7,6 @@ export default defineConfig({
   resolve: {
     alias: { '@': path.resolve(__dirname, 'src') },
   },
+  // Ensure .env is loaded from project root (same dir as this config) regardless of cwd
+  envDir: path.resolve(__dirname),
 })

@@ -19,11 +19,18 @@ export interface HypothesisEvidence {
   date: string
 }
 
+export interface CaseStudyImage {
+  url: string
+  alt: string
+  credit?: string
+}
+
 export interface CaseStudy {
   id: string
   title: string
   summary: string
   relevance: string
+  image?: CaseStudyImage
 }
 
 export interface ProtocolSection {

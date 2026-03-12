@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
+import { LOGIN_IMAGE } from '@/data/imageAssets'
 
 const TEAM_PASSKEY = import.meta.env.VITE_TEAM_SIGNUP_PASSKEY ?? '2137'
 
@@ -98,7 +99,9 @@ export default function LoginPage() {
       <div className="login-page">
         <div className="login-card">
           <h1>Log in</h1>
-          <p className="login-muted">Sign-in is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.</p>
+          <p className="login-muted">
+            Sign-in is not configured. Add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> to a <code>.env</code> file in the project root, then restart the dev server (stop and run <code>npm run dev</code> again).
+          </p>
           <Link to="/">Back to app</Link>
         </div>
       </div>
@@ -107,7 +110,17 @@ export default function LoginPage() {
 
   return (
     <div className="login-page">
-      <div className="login-card">
+      <div className="login-split">
+        <div
+          className="login-split-image"
+          style={{ backgroundImage: `url(${LOGIN_IMAGE})` }}
+          role="img"
+          aria-label="Coral reef and ocean"
+        >
+          <span className="login-split-overlay" aria-hidden />
+        </div>
+        <div className="login-split-form">
+          <div className="login-card">
         {step === 'login' && (
           <>
             <h1>Log in</h1>
@@ -229,6 +242,8 @@ export default function LoginPage() {
         <p className="login-back-home">
           <Link to="/">← Back to app</Link>
         </p>
+          </div>
+        </div>
       </div>
     </div>
   )

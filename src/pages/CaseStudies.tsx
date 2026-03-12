@@ -16,6 +16,12 @@ export default function CaseStudies() {
             key={c.id}
             className={`case-card ${expandedId === c.id ? 'expanded' : ''}`}
           >
+            {c.image && (
+              <div className="case-card-image">
+                <img src={c.image.url} alt={c.image.alt} loading="lazy" />
+                {c.image.credit && <span className="photo-credit">{c.image.credit}</span>}
+              </div>
+            )}
             <button
               type="button"
               className="case-card-header"
