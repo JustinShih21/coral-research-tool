@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useImperativeHandle, forwardRef } from 'react'
 import * as d3 from 'd3'
 import type { GraphNode, GraphEdge } from '@/types/graph'
-import { CATEGORY_COLORS, CATEGORY_ABBREV, RELATIONSHIP_STYLE } from './constants'
+import { CATEGORY_COLORS, CATEGORY_ICON_PATHS, RELATIONSHIP_STYLE } from './constants'
 
 interface D3Node extends GraphNode {
   x?: number
@@ -127,6 +127,15 @@ const ForceGraph = forwardRef<ForceGraphHandle, ForceGraphProps>(function ForceG
     sm.append('feMergeNode').attr('in', 'blur')
     sm.append('feMergeNode').attr('in', 'SourceGraphic')
 
+    // ── Category icon symbols (referenced by <use> on each node) ─────
+    Object.entries(CATEGORY_ICON_PATHS).forEach(([cat, markup]) => {
+      defs.append('symbol')
+        .attr('id', `fg-icon-${cat}`)
+        .attr('viewBox', '0 0 24 24')
+        .attr('overflow', 'visible')
+        .html(markup)
+    })
+
     // ── Background ────────────────────────────────────────────────────
     svg.append('rect').attr('width', width).attr('height', height).attr('fill', 'url(#fg-bg)')
     svg.append('rect').attr('width', width).attr('height', height)
@@ -190,19 +199,18 @@ const ForceGraph = forwardRef<ForceGraphHandle, ForceGraphProps>(function ForceG
       onSelectCb(selectedIdRef.current === d.id ? null : d.id)
     })
 
-    // ── Category abbreviation inside each node ────────────────────────
-    const nodeAbbrev = g.append('g').attr('class', 'node-abbrevs')
-      .selectAll<SVGTextElement, D3Node>('text').data(d3Nodes).join('text')
-      .text((d) => CATEGORY_ABBREV[d.category])
-      .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
-      .attr('font-size', (d) => Math.min(radiusFromNode(d) * 0.72, 13))
-      .attr('font-weight', '700')
-      .attr('font-family', 'DM Sans, system-ui, sans-serif')
-      .attr('fill', 'rgba(255,255,255,0.82)')
-      .attr('letter-spacing', '0.02em')
+    // ── Category icon inside each node (SVG <use> referencing defs symbols) ──
+    const nodeIcons = g.append('g').attr('class', 'node-icons')
+      .selectAll<SVGUseElement, D3Node>('use').data(d3Nodes).join('use')
+      .attr('href', (d) => `#fg-icon-${d.category}`)
+      .attr('width', (d) => radiusFromNode(d) * 1.15)
+      .attr('height', (d) => radiusFromNode(d) * 1.15)
+      .attr('fill', 'none')
+      .attr('stroke', 'rgba(255,255,255,0.85)')
+      .attr('stroke-width', 2)
+      .attr('stroke-linecap', 'round')
+      .attr('stroke-linejoin', 'round')
       .style('pointer-events', 'none')
-      .style('user-select', 'none')
 
     // ── Labels: hidden by default, shown on hover / selection / path ──
     const label = g.append('g').attr('class', 'labels')
@@ -270,7 +278,9 @@ const ForceGraph = forwardRef<ForceGraphHandle, ForceGraphProps>(function ForceG
       })
       halo.attr('cx', (d) => d.x ?? 0).attr('cy', (d) => d.y ?? 0)
       nodeSel.attr('cx', (d) => d.x ?? 0).attr('cy', (d) => d.y ?? 0)
-      nodeAbbrev.attr('x', (d) => d.x ?? 0).attr('y', (d) => d.y ?? 0)
+      nodeIcons
+        .attr('x', (d) => (d.x ?? 0) - radiusFromNode(d) * 0.575)
+        .attr('y', (d) => (d.y ?? 0) - radiusFromNode(d) * 0.575)
       label.attr('x', (d) => d.x ?? 0).attr('y', (d) => d.y ?? 0)
     }
 
@@ -320,8 +330,8 @@ const ForceGraph = forwardRef<ForceGraphHandle, ForceGraphProps>(function ForceG
         return c?.copy({ opacity }).toString() ?? 'none'
       })
 
-    svg.selectAll<SVGTextElement, D3Node>('.node-abbrevs text')
-      .attr('opacity', (d) => pathNodeIds.size === 0 || pathNodeIds.has(d.id) ? 0.82 : 0.2)
+    svg.selectAll<SVGUseElement, D3Node>('.node-icons use')
+      .attr('opacity', (d) => pathNodeIds.size === 0 || pathNodeIds.has(d.id) ? 0.85 : 0.15)
 
     // Labels: full opacity for selected/path nodes, dimmed otherwise
     svg.selectAll<SVGTextElement, D3Node>('.labels text')
