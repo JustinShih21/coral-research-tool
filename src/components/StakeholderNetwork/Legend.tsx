@@ -1,15 +1,5 @@
-import { CATEGORY_COLORS, CATEGORY_LABELS, RELATIONSHIP_STYLE } from './constants'
-import type { ActorCategory, RelationshipType } from '@/types/graph'
-
-const CATEGORIES: ActorCategory[] = [
-  'restoration_operator',
-  'tourism_dive',
-  'government',
-  'investor_funder',
-  'fisheries',
-  'degradation_driver',
-  'insurance_finance',
-]
+import { RELATIONSHIP_STYLE } from './constants'
+import type { RelationshipType } from '@/types/graph'
 
 const REL_TYPES: RelationshipType[] = [
   'funding',
@@ -20,42 +10,49 @@ const REL_TYPES: RelationshipType[] = [
   'proposed',
 ]
 
+const REL_LABELS: Record<RelationshipType, string> = {
+  funding: 'Funding',
+  dependency: 'Dependency',
+  data: 'Data',
+  regulation: 'Regulation',
+  degradation: 'Degradation',
+  proposed: 'Proposed',
+}
+
 export default function Legend() {
   return (
-    <div className="network-legend">
-      <div className="legend-block">
-        <h4>Node (actor type)</h4>
-        <ul className="legend-nodes">
-          {CATEGORIES.map((cat) => (
-            <li key={cat}>
-              <span className="legend-dot" style={{ background: CATEGORY_COLORS[cat] }} />
-              {CATEGORY_LABELS[cat]}
-            </li>
-          ))}
-        </ul>
+    <div className="nf-legend">
+      <div className="nf-legend-section">
+        <span className="nf-section-title">Node size = funding scale</span>
       </div>
-      <div className="legend-block">
-        <h4>Edge (relationship)</h4>
-        <ul className="legend-edges">
+
+      <div className="nf-legend-section">
+        <span className="nf-section-title">Edge style</span>
+        <ul className="nf-legend-edges">
           {REL_TYPES.map((rel) => {
             const s = RELATIONSHIP_STYLE[rel]
             return (
-              <li key={rel}>
-                <svg width={32} height={8} className="legend-line-svg">
+              <li key={rel} className="nf-legend-edge-item">
+                <svg width="24" height="8" style={{ flexShrink: 0 }}>
                   <line
-                    x1={0}
-                    y1={4}
-                    x2={32}
-                    y2={4}
+                    x1="0" y1="4" x2="24" y2="4"
                     stroke={s.stroke}
-                    strokeWidth={s.strokeWidth}
+                    strokeWidth={Math.min(s.strokeWidth, 2)}
                     strokeDasharray={s.strokeDasharray}
                   />
                 </svg>
-                {rel}
+                <span>{REL_LABELS[rel]}</span>
               </li>
             )
           })}
+        </ul>
+      </div>
+
+      <div className="nf-legend-section">
+        <span className="nf-section-title">Interview status</span>
+        <ul className="nf-legend-status">
+          <li><span className="nf-legend-ring ring-solid" />Confirmed / Completed</li>
+          <li><span className="nf-legend-ring ring-dashed" />Targeted (not yet)</li>
         </ul>
       </div>
     </div>

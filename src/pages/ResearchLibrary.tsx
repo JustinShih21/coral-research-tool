@@ -170,32 +170,35 @@ export default function ResearchLibrary() {
       )}
       {tab === 'recordings' && (
         <ul className="library-list recordings-list">
-          {filteredRecordings.map((rec) => (
-            <li key={rec.id} className="library-card recording-card">
-              <h3>{rec.title}</h3>
-              <p className="library-description">{rec.description}</p>
-              <div className="library-meta">
-                <span className="library-source">{rec.source}</span>
-                <span className="recording-type">{rec.type}</span>
-              </div>
-              {rec.link ? (
-                <div className="recording-embed">
-                  {rec.type === 'video' ? (
-                    <video controls src={rec.link} className="recording-player" />
-                  ) : (
-                    <audio controls src={rec.link} className="recording-player" />
-                  )}
+          {filteredRecordings.map((rec) => {
+            const safeLink = rec.link ? encodeURI(rec.link) : undefined
+            return (
+              <li key={rec.id} className="library-card recording-card">
+                <h3>{rec.title}</h3>
+                <p className="library-description">{rec.description}</p>
+                <div className="library-meta">
+                  <span className="library-source">{rec.source}</span>
+                  <span className="recording-type">{rec.type}</span>
                 </div>
-              ) : (
-                <p className="recording-placeholder">Add a link in the data to enable playback.</p>
-              )}
-              {rec.link && (
-                <a href={rec.link} target="_blank" rel="noopener noreferrer" className="library-link">
-                  Open in new tab
-                </a>
-              )}
-            </li>
-          ))}
+                {safeLink ? (
+                  <div className="recording-embed">
+                    {rec.type === 'video' ? (
+                      <video controls src={safeLink} className="recording-player" />
+                    ) : (
+                      <audio controls src={safeLink} className="recording-player" />
+                    )}
+                  </div>
+                ) : (
+                  <p className="recording-placeholder">Add a link in the data to enable playback.</p>
+                )}
+                {safeLink && (
+                  <a href={safeLink} target="_blank" rel="noopener noreferrer" className="library-link">
+                    Open in new tab
+                  </a>
+                )}
+              </li>
+            )
+          })}
         </ul>
       )}
     </div>

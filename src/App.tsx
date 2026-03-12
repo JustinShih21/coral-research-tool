@@ -9,6 +9,7 @@ import CaseStudies from './pages/CaseStudies'
 import BottleneckDiagnostic from './pages/BottleneckDiagnostic'
 import ResearchLibrary from './pages/ResearchLibrary'
 import Contacts from './pages/Contacts'
+import LeonLivingSeasBriefing from './pages/LeonLivingSeasBriefing'
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="/bottlenecks" element={<BottleneckDiagnostic />} />
         <Route path="/library" element={<ResearchLibrary />} />
         <Route path="/contacts" element={<Contacts />} />
+        <Route path="/leon-living-seas" element={<LeonLivingSeasBriefing />} />
       </Routes>
     </Layout>
   )

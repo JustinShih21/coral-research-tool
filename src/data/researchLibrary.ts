@@ -158,7 +158,7 @@ export const libraryRecordings: LibraryRecording[] = [
     description: 'Interview recording with Leon Boey (Living Seas), Feb 2026.',
     type: 'video',
     source: 'New 2026',
-    // link: 'https://...' — add when hosted
+    link: '/Coral Farming/New 2026/LivingSeasLeonBoeyFeb3.mp4',
   },
   {
     id: 'coral-catch-recording',
@@ -166,6 +166,7 @@ export const libraryRecordings: LibraryRecording[] = [
     description: 'Field recording from Coral Catch engagement.',
     type: 'video',
     source: 'Trip Notes / Interviews',
+    link: '/Coral Farming/Trip Notes/Interviews/coralCatchRecording.mp4',
   },
   {
     id: 'indonesia-biru-foundation',
@@ -173,5 +174,6 @@ export const libraryRecordings: LibraryRecording[] = [
     description: 'Interview recording with Indonesia Biru Foundation.',
     type: 'audio',
     source: 'Trip Notes / Interviews',
+    link: '/Coral Farming/Trip Notes/Interviews/indonesia biru foundation.m4a',
   },
 ]

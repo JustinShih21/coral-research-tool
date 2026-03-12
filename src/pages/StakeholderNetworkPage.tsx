@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import ForceGraph from '@/components/StakeholderNetwork/ForceGraph'
+import ForceGraph, { type ForceGraphHandle } from '@/components/StakeholderNetwork/ForceGraph'
 import NodeDetailPanel from '@/components/StakeholderNetwork/NodeDetailPanel'
 import Legend from '@/components/StakeholderNetwork/Legend'
 import Filters from '@/components/StakeholderNetwork/Filters'
@@ -17,7 +17,17 @@ export default function StakeholderNetworkPage() {
   const [nodeNotes, setNodeNotes] = useState<Record<string, string>>({})
   const [savedAt, setSavedAt] = useState<number | null>(null)
   const [saveStatus, setSaveStatus] = useState<'cloud' | 'local' | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const graphRef = useRef<ForceGraphHandle>(null)
+
+  // Escape main padding so the network page fills the full area
+  useEffect(() => {
+    const main = document.querySelector('.main') as HTMLElement | null
+    if (!main) return
+    main.classList.add('main--network')
+    return () => main.classList.remove('main--network')
+  }, [])
 
   useEffect(() => {
     getResearchData<Record<string, string>>(STORAGE_KEY_NOTES).then((data) => {
@@ -53,27 +63,19 @@ export default function StakeholderNetworkPage() {
 
   useEffect(() => {
     if (!selectedNodeId) return
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setSelectedNodeId(null)
-    }
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelectedNodeId(null) }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [selectedNodeId])
 
   const handleExport = useCallback(() => {
-    const nodesWithNotes = filteredNodes.map((node) => ({
-      ...node,
-      notes: nodeNotes[node.id] ?? node.notes,
-    }))
     const payload = {
-      nodes: nodesWithNotes,
+      nodes: filteredNodes.map((n) => ({ ...n, notes: nodeNotes[n.id] ?? n.notes })),
       edges: filteredEdges,
       nodeNotesOverride: nodeNotes,
       exportedAt: new Date().toISOString(),
     }
-    const blob = new Blob([JSON.stringify(payload, null, 2)], {
-      type: 'application/json',
-    })
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -94,37 +96,92 @@ export default function StakeholderNetworkPage() {
     if (!el) return
     const ro = new ResizeObserver((entries) => {
       const { width, height } = entries[0]?.contentRect ?? { width: 800, height: 500 }
-      setGraphSize({
-        width: Math.max(300, Math.floor(width)),
-        height: Math.max(300, Math.floor(height)),
-      })
+      setGraphSize({ width: Math.max(300, Math.floor(width)), height: Math.max(300, Math.floor(height)) })
     })
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
 
+  const pathActive = pathFrom !== null || pathTo !== null
+
   return (
     <div className="network-page">
-      <h1>Stakeholder Network</h1>
-      <p className="network-intro">
-        Interactive map of beneficiaries, protection actors, governance institutions, and degradation drivers. Click a node for details; use filters and path highlight to inspect coordination and financing gaps.
-      </p>
-      <div className="network-content">
-        <div className="network-side">
-          <Filters
-            filters={filters}
-            setFilters={setFilters}
-            pathFrom={pathFrom}
-            pathTo={pathTo}
-            setPathFrom={setPathFrom}
-            setPathTo={setPathTo}
-            nodeIds={stakeholderGraph.nodes.map((n) => ({ id: n.id, name: n.name }))}
-            onExport={handleExport}
-          />
-          <Legend />
+      {/* ── Toolbar ── */}
+      <div className="network-toolbar">
+        <div className="network-toolbar-left">
+          <button
+            type="button"
+            className={`network-sidebar-btn ${sidebarOpen ? 'open' : ''}`}
+            onClick={() => setSidebarOpen((o) => !o)}
+            aria-label="Toggle filters"
+          >
+            <span className="network-sidebar-btn-icon">
+              <span /><span /><span />
+            </span>
+            <span className="network-sidebar-btn-label">{sidebarOpen ? 'Filters' : 'Filters'}</span>
+          </button>
+          <div className="network-title-wrap">
+            <span className="network-title-label">Stakeholder Network</span>
+            <span className="network-title-sub">Indonesia Coral Reef Ecosystem</span>
+          </div>
         </div>
+
+        <div className="network-stats">
+          <div className="network-stat">
+            <span className="network-stat-val">{filteredNodes.length}</span>
+            <span className="network-stat-key">actors</span>
+          </div>
+          <div className="network-stat-sep" />
+          <div className="network-stat">
+            <span className="network-stat-val">{filteredEdges.length}</span>
+            <span className="network-stat-key">connections</span>
+          </div>
+          {pathActive && (
+            <>
+              <div className="network-stat-sep" />
+              <div className="network-stat network-stat--path">
+                <span className="network-stat-val">{pathNodeIds.size}</span>
+                <span className="network-stat-key">on path</span>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="network-toolbar-right">
+          <div className="network-zoom-controls">
+            <button type="button" onClick={() => graphRef.current?.zoomOut()} aria-label="Zoom out" title="Zoom out">−</button>
+            <button type="button" onClick={() => graphRef.current?.resetZoom()} aria-label="Reset zoom" title="Reset zoom">⊙</button>
+            <button type="button" onClick={() => graphRef.current?.zoomIn()} aria-label="Zoom in" title="Zoom in">+</button>
+          </div>
+          <button type="button" className="network-export-btn" onClick={handleExport}>
+            Export JSON
+          </button>
+        </div>
+      </div>
+
+      {/* ── Body ── */}
+      <div className="network-body">
+        {/* Sidebar: filters + legend */}
+        <aside className={`network-sidebar ${sidebarOpen ? 'open' : ''}`}>
+          <div className="network-sidebar-inner">
+            <Filters
+              filters={filters}
+              setFilters={setFilters}
+              pathFrom={pathFrom}
+              pathTo={pathTo}
+              setPathFrom={setPathFrom}
+              setPathTo={setPathTo}
+              nodeIds={stakeholderGraph.nodes.map((n) => ({ id: n.id, name: n.name }))}
+              onExport={handleExport}
+            />
+            <Legend />
+          </div>
+        </aside>
+
+        {/* Graph canvas */}
         <div ref={graphWrapRef} className="network-graph-wrap">
           <ForceGraph
+            ref={graphRef}
             nodes={filteredNodes}
             edges={filteredEdges}
             pathNodeIds={pathNodeIds}
@@ -134,9 +191,17 @@ export default function StakeholderNetworkPage() {
             width={graphSize.width}
             height={graphSize.height}
           />
+          {/* Graph hint */}
+          {filteredNodes.length > 0 && !selectedNodeId && (
+            <div className="network-graph-hint">
+              Click a node to explore · Scroll to zoom · Drag to pan
+            </div>
+          )}
         </div>
-        {selectedNode && (
-          <aside className="network-panel-wrap">
+
+        {/* Detail panel */}
+        <aside className={`network-detail-wrap ${selectedNode ? 'open' : ''}`}>
+          {selectedNode && (
             <NodeDetailPanel
               node={selectedNode}
               edges={stakeholderGraph.edges.filter(
@@ -148,8 +213,8 @@ export default function StakeholderNetworkPage() {
               lastSavedAt={savedAt}
               saveStatus={saveStatus}
             />
-          </aside>
-        )}
+          )}
+        </aside>
       </div>
     </div>
   )

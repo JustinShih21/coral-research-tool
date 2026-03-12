@@ -21,6 +21,7 @@ export default function Layout({ children }: { children?: React.ReactNode }) {
     { to: '/', label: 'Dashboard' },
     { to: '/network', label: 'Stakeholder Network' },
     { to: '/contacts', label: 'Contacts' },
+    { to: '/leon-living-seas', label: 'Leon + Living Seas' },
     { to: '/funding', label: 'Funding Flows' },
     { to: '/hypotheses', label: 'Hypothesis Tracker' },
     { to: '/interview', label: 'Interview Protocol' },
