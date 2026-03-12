@@ -7,7 +7,6 @@ import StakeholderNetworkPage from './pages/StakeholderNetworkPage'
 import HypothesisTracker from './pages/HypothesisTracker'
 import InterviewProtocol from './pages/InterviewProtocol'
 import CaseStudies from './pages/CaseStudies'
-import BottleneckDiagnostic from './pages/BottleneckDiagnostic'
 import ResearchLibrary from './pages/ResearchLibrary'
 import Contacts from './pages/Contacts'
 import LeonLivingSeasBriefing from './pages/LeonLivingSeasBriefing'
@@ -26,7 +25,6 @@ export default function App() {
               <Route path="/hypotheses" element={<TeamOnlyRoute><HypothesisTracker /></TeamOnlyRoute>} />
               <Route path="/interview" element={<TeamOnlyRoute><InterviewProtocol /></TeamOnlyRoute>} />
               <Route path="/cases" element={<CaseStudies />} />
-              <Route path="/bottlenecks" element={<TeamOnlyRoute><BottleneckDiagnostic /></TeamOnlyRoute>} />
               <Route path="/library" element={<ResearchLibrary />} />
               <Route path="/contacts" element={<Contacts />} />
               <Route path="/leon-living-seas" element={<TeamOnlyRoute><LeonLivingSeasBriefing /></TeamOnlyRoute>} />

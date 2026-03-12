@@ -36,7 +36,6 @@ export default function Layout({ children }: { children?: React.ReactNode }) {
     { to: '/network', label: 'Stakeholder Network' },
     { to: '/hypotheses', label: 'Hypothesis Tracker' },
     { to: '/interview', label: 'Interview Protocol' },
-    { to: '/bottlenecks', label: 'Bottleneck Diagnostic' },
     { to: '/leon-living-seas', label: 'Leon + Living Seas' },
   ]
 

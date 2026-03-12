@@ -55,5 +55,4 @@ export const RESEARCH_KEYS = [
   'coral-network-notes',
   'coral-hypotheses',
   'coral-interview-notes',
-  'coral-bottlenecks',
 ] as const

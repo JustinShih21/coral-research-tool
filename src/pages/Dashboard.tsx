@@ -233,7 +233,7 @@ export default function Dashboard() {
         <section className="backup-restore">
           <h2>Backup / Restore</h2>
           <p className="backup-restore-intro">
-            Download all saved data (stakeholder notes, hypotheses, interview notes, bottleneck scores) to a file, or restore from a previous backup.
+            Download all saved data (stakeholder notes, hypotheses, interview notes) to a file, or restore from a previous backup.
           </p>
           <div className="backup-restore-actions">
             <button type="button" className="backup-btn" onClick={() => downloadBackup()}>

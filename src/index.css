@@ -1583,46 +1583,6 @@ input, textarea {
 .case-body h4 { margin: 1rem 0 0.35rem; font-size: 12px; font-weight: 600; color: var(--color-text-muted); }
 .case-relevance { margin: 0; font-size: 14px; }
 
-/* Bottleneck Diagnostic */
-.bottleneck-diagnostic h1 { margin: 0 0 0.5rem; }
-.bottleneck-intro { margin: 0 0 1rem; color: var(--color-text-muted); }
-.bottleneck-dominant { margin-bottom: 1rem; padding: 0.75rem; background: rgba(0, 123, 110, 0.1); border-radius: var(--radius); font-size: 14px; }
-.bottleneck-list { display: flex; flex-direction: column; gap: 1rem; }
-.bottleneck-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: 1.25rem;
-  box-shadow: var(--shadow);
-  transition: box-shadow var(--transition), border-color var(--transition);
-}
-.bottleneck-card:hover {
-  box-shadow: var(--shadow-hover);
-  border-color: rgba(0, 123, 110, 0.2);
-}
-.bottleneck-card h3 { margin: 0 0 0.5rem; font-size: 1rem; }
-.bottleneck-desc { margin: 0 0 1rem; font-size: 14px; color: var(--color-text-muted); }
-.bottleneck-controls label { display: block; margin-bottom: 0.5rem; font-size: 13px; }
-.bottleneck-controls input[type="text"] { display: block; width: 100%; margin-top: 0.25rem; padding: 0.5rem; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 13px; }
-.bottleneck-severity-wrap { margin-bottom: 1rem; }
-.bottleneck-severity-label { display: block; font-size: 13px; margin-bottom: 0.5rem; }
-.bottleneck-severity-dots { display: flex; gap: 0.35rem; flex-wrap: wrap; }
-.bottleneck-dot {
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: 50%;
-  border: 2px solid var(--color-border);
-  background: var(--color-surface);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--transition), border-color var(--transition), transform var(--transition);
-}
-.bottleneck-dot:hover { border-color: var(--color-primary); background: rgba(0, 123, 110, 0.08); transform: scale(1.05); }
-.bottleneck-dot.filled { background: rgba(0, 123, 110, 0.2); border-color: rgba(0, 123, 110, 0.5); }
-.bottleneck-dot.active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
-.bottleneck-dot.active:hover { background: #006b5f; border-color: #006b5f; }
-
 /* Research Library */
 .library-header {
   position: relative;

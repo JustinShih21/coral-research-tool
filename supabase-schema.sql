@@ -1,5 +1,5 @@
 -- Run this in the Supabase SQL Editor (Dashboard → SQL Editor).
--- research_data: shared research tool data (notes, hypotheses, interview notes, bottlenecks).
+-- research_data: shared research tool data (notes, hypotheses, interview notes).
 -- Only authenticated users can write; everyone can read.
 
 create table if not exists research_data (

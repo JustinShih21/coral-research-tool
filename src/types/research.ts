@@ -38,11 +38,3 @@ export interface ProtocolSection {
   stakeholderType: string
   questions: { id: string; text: string }[]
 }
-
-export interface BottleneckType {
-  id: string
-  name: string
-  description: string
-  severity: number
-  notes: string
-}
