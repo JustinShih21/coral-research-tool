@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useImperativeHandle, forwardRef } from 'react'
 import * as d3 from 'd3'
 import type { GraphNode, GraphEdge } from '@/types/graph'
-import { CATEGORY_COLORS, RELATIONSHIP_STYLE } from './constants'
+import { CATEGORY_COLORS, CATEGORY_ABBREV, RELATIONSHIP_STYLE } from './constants'
 
 interface D3Node extends GraphNode {
   x?: number
@@ -38,8 +38,8 @@ interface ForceGraphProps {
   height: number
 }
 
-const NODE_RADIUS_MIN = 10
-const NODE_RADIUS_MAX = 26
+const NODE_RADIUS_MIN = 12
+const NODE_RADIUS_MAX = 28
 
 function radiusFromNode(node: GraphNode): number {
   const basis = Math.log1p(node.annual_funding_USD || node.dependency_score * 50000)
@@ -80,8 +80,8 @@ const ForceGraph = forwardRef<ForceGraphHandle, ForceGraphProps>(function ForceG
     const nodeMap = new Map<string, D3Node>()
     const d3Nodes: D3Node[] = nodes.map((n) => {
       const d: D3Node = { ...n }
-      if (d.x == null) d.x = width / 2 + (Math.random() - 0.5) * 300
-      if (d.y == null) d.y = height / 2 + (Math.random() - 0.5) * 300
+      if (d.x == null) d.x = width / 2 + (Math.random() - 0.5) * 400
+      if (d.y == null) d.y = height / 2 + (Math.random() - 0.5) * 400
       nodeMap.set(n.id, d)
       return d
     })
@@ -103,30 +103,26 @@ const ForceGraph = forwardRef<ForceGraphHandle, ForceGraphProps>(function ForceG
     // ── Defs ──────────────────────────────────────────────────────────
     const defs = svg.append('defs')
 
-    // Background radial gradient
     const bgGrad = defs.append('radialGradient')
       .attr('id', 'fg-bg').attr('cx', '50%').attr('cy', '42%').attr('r', '68%')
     bgGrad.append('stop').attr('offset', '0%').attr('stop-color', '#0e2538')
     bgGrad.append('stop').attr('offset', '100%').attr('stop-color', '#050e18')
 
-    // Vignette
     const vigGrad = defs.append('radialGradient')
       .attr('id', 'fg-vignette').attr('cx', '50%').attr('cy', '50%').attr('r', '70%')
     vigGrad.append('stop').attr('offset', '55%').attr('stop-color', '#000').attr('stop-opacity', '0')
-    vigGrad.append('stop').attr('offset', '100%').attr('stop-color', '#000').attr('stop-opacity', '0.55')
+    vigGrad.append('stop').attr('offset', '100%').attr('stop-color', '#000').attr('stop-opacity', '0.5')
 
-    // Node glow filter
     const glowF = defs.append('filter')
       .attr('id', 'fg-glow').attr('x', '-50%').attr('y', '-50%').attr('width', '200%').attr('height', '200%')
-    glowF.append('feGaussianBlur').attr('stdDeviation', '4.5').attr('result', 'blur')
+    glowF.append('feGaussianBlur').attr('stdDeviation', '4').attr('result', 'blur')
     const gm = glowF.append('feMerge')
     gm.append('feMergeNode').attr('in', 'blur')
     gm.append('feMergeNode').attr('in', 'SourceGraphic')
 
-    // Selected / hovered glow (stronger)
     const selF = defs.append('filter')
       .attr('id', 'fg-sel').attr('x', '-100%').attr('y', '-100%').attr('width', '300%').attr('height', '300%')
-    selF.append('feGaussianBlur').attr('stdDeviation', '12').attr('result', 'blur')
+    selF.append('feGaussianBlur').attr('stdDeviation', '10').attr('result', 'blur')
     const sm = selF.append('feMerge')
     sm.append('feMergeNode').attr('in', 'blur')
     sm.append('feMergeNode').attr('in', 'SourceGraphic')
@@ -136,32 +132,33 @@ const ForceGraph = forwardRef<ForceGraphHandle, ForceGraphProps>(function ForceG
     svg.append('rect').attr('width', width).attr('height', height)
       .attr('fill', 'url(#fg-vignette)').style('pointer-events', 'none')
 
-    // ── Zoom group ────────────────────────────────────────────────────
+    // ── Zoom ──────────────────────────────────────────────────────────
     const g = svg.append('g').attr('class', 'zoom-g')
     const zoom = d3.zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.15, 4])
+      .scaleExtent([0.1, 4])
       .on('zoom', (ev) => g.attr('transform', ev.transform))
     svg.call(zoom)
     zoomRef.current = zoom
     svg.on('click', () => onSelectCb(null))
 
-    // ── Links ─────────────────────────────────────────────────────────
+    // ── Links (curved arcs) ───────────────────────────────────────────
     const link = g.append('g').attr('class', 'links')
-      .selectAll('line').data(d3Links).join('line')
-      .attr('stroke', (d) => d3.color(RELATIONSHIP_STYLE[d.relationship_type].stroke)?.brighter(0.7).toString() ?? RELATIONSHIP_STYLE[d.relationship_type].stroke)
+      .selectAll('path').data(d3Links).join('path')
+      .attr('fill', 'none')
+      .attr('stroke', (d) => d3.color(RELATIONSHIP_STYLE[d.relationship_type].stroke)?.brighter(0.6).toString() ?? RELATIONSHIP_STYLE[d.relationship_type].stroke)
       .attr('stroke-dasharray', (d) => RELATIONSHIP_STYLE[d.relationship_type].strokeDasharray)
       .attr('stroke-width', (d) =>
         d.relationship_type === 'funding'
-          ? Math.min(5, 1.5 + d.annual_value_USD / 400000)
+          ? Math.min(4.5, 1.5 + d.annual_value_USD / 400000)
           : RELATIONSHIP_STYLE[d.relationship_type].strokeWidth + 0.5
       )
-      .attr('stroke-opacity', 0.4)
+      .attr('stroke-opacity', 0.38)
 
     // ── Halos ─────────────────────────────────────────────────────────
     const halo = g.append('g').attr('class', 'halos')
       .selectAll<SVGCircleElement, D3Node>('circle').data(d3Nodes).join('circle')
-      .attr('r', (d) => radiusFromNode(d) + 9)
-      .attr('fill', (d) => d3.color(CATEGORY_COLORS[d.category])?.copy({ opacity: 0.12 }).toString() ?? 'none')
+      .attr('r', (d) => radiusFromNode(d) + 10)
+      .attr('fill', (d) => d3.color(CATEGORY_COLORS[d.category])?.copy({ opacity: 0.1 }).toString() ?? 'none')
       .attr('stroke', 'none')
       .style('pointer-events', 'none')
 
@@ -193,26 +190,41 @@ const ForceGraph = forwardRef<ForceGraphHandle, ForceGraphProps>(function ForceG
       onSelectCb(selectedIdRef.current === d.id ? null : d.id)
     })
 
-    // ── Labels ────────────────────────────────────────────────────────
+    // ── Category abbreviation inside each node ────────────────────────
+    const nodeAbbrev = g.append('g').attr('class', 'node-abbrevs')
+      .selectAll<SVGTextElement, D3Node>('text').data(d3Nodes).join('text')
+      .text((d) => CATEGORY_ABBREV[d.category])
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'central')
+      .attr('font-size', (d) => Math.min(radiusFromNode(d) * 0.72, 13))
+      .attr('font-weight', '700')
+      .attr('font-family', 'DM Sans, system-ui, sans-serif')
+      .attr('fill', 'rgba(255,255,255,0.82)')
+      .attr('letter-spacing', '0.02em')
+      .style('pointer-events', 'none')
+      .style('user-select', 'none')
+
+    // ── Labels: hidden by default, shown on hover / selection / path ──
     const label = g.append('g').attr('class', 'labels')
       .selectAll<SVGTextElement, D3Node>('text').data(d3Nodes).join('text')
       .text((d) => d.name)
-      .attr('font-size', 11)
+      .attr('font-size', 11.5)
       .attr('font-family', 'DM Sans, system-ui, sans-serif')
       .attr('font-weight', '500')
-      .attr('fill', '#a8d4ea')
+      .attr('fill', '#c8e6f5')
       .attr('paint-order', 'stroke')
-      .attr('stroke', 'rgba(5, 14, 24, 0.85)')
-      .attr('stroke-width', 3)
+      .attr('stroke', 'rgba(5, 14, 24, 0.9)')
+      .attr('stroke-width', 3.5)
       .attr('stroke-linejoin', 'round')
-      .attr('dx', (d) => radiusFromNode(d) + 6)
+      .attr('dx', (d) => radiusFromNode(d) + 7)
       .attr('dy', 4)
+      .attr('opacity', 0)               // Hidden until hover / selection
       .style('pointer-events', 'none')
 
     // ── Tooltip ───────────────────────────────────────────────────────
     const tip = d3.select('body').append('div').attr('class', 'graph-tooltip')
       .style('position', 'absolute').style('visibility', 'hidden')
-      .style('background', 'rgba(5, 14, 24, 0.96)')
+      .style('background', 'rgba(5, 14, 24, 0.97)')
       .style('border', '1px solid rgba(100, 160, 210, 0.22)')
       .style('border-radius', '10px')
       .style('padding', '10px 14px')
@@ -223,6 +235,8 @@ const ForceGraph = forwardRef<ForceGraphHandle, ForceGraphProps>(function ForceG
 
     nodeSel
       .on('mouseover', (_ev, d) => {
+        // Show this node's label
+        label.filter((ld) => ld.id === d.id).attr('opacity', 1)
         tip.style('visibility', 'visible').html(
           `<strong style="color:#fff;font-size:14px">${d.name}</strong><br/>
            <span style="color:#55acd4;font-size:11px;text-transform:uppercase;letter-spacing:.06em">${d.category.replace(/_/g, ' ')}</span>
@@ -231,24 +245,41 @@ const ForceGraph = forwardRef<ForceGraphHandle, ForceGraphProps>(function ForceG
         )
       })
       .on('mousemove', (e) => tip.style('top', `${(e as MouseEvent).pageY + 14}px`).style('left', `${(e as MouseEvent).pageX + 14}px`))
-      .on('mouseout', () => tip.style('visibility', 'hidden'))
+      .on('mouseout', (_ev, d) => {
+        // Hide label again unless it's selected or on an active path
+        const isSelected = selectedIdRef.current === d.id
+        const isOnPath = pathNodeIds.size > 0 && pathNodeIds.has(d.id)
+        if (!isSelected && !isOnPath) {
+          label.filter((ld) => ld.id === d.id).attr('opacity', 0)
+        }
+        tip.style('visibility', 'hidden')
+      })
 
     // ── Tick ─────────────────────────────────────────────────────────
+    function arcPath(sx: number, sy: number, tx: number, ty: number): string {
+      const dx = tx - sx, dy = ty - sy
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      const dr = dist * 0.55          // subtle arc — larger = more curve
+      return `M${sx},${sy}A${dr},${dr} 0 0,1 ${tx},${ty}`
+    }
+
     function ticked() {
-      link
-        .attr('x1', (d) => (d.source as D3Node).x ?? 0).attr('y1', (d) => (d.source as D3Node).y ?? 0)
-        .attr('x2', (d) => (d.target as D3Node).x ?? 0).attr('y2', (d) => (d.target as D3Node).y ?? 0)
+      link.attr('d', (d) => {
+        const s = d.source as D3Node, t = d.target as D3Node
+        return arcPath(s.x ?? 0, s.y ?? 0, t.x ?? 0, t.y ?? 0)
+      })
       halo.attr('cx', (d) => d.x ?? 0).attr('cy', (d) => d.y ?? 0)
       nodeSel.attr('cx', (d) => d.x ?? 0).attr('cy', (d) => d.y ?? 0)
+      nodeAbbrev.attr('x', (d) => d.x ?? 0).attr('y', (d) => d.y ?? 0)
       label.attr('x', (d) => d.x ?? 0).attr('y', (d) => d.y ?? 0)
     }
 
-    // ── Simulation ────────────────────────────────────────────────────
+    // ── Simulation — much stronger spread ─────────────────────────────
     const sim = d3.forceSimulation<D3Node>(d3Nodes)
-      .force('link', d3.forceLink<D3Node, D3Link>(d3Links).id((d) => d.id).distance(140))
-      .force('charge', d3.forceManyBody().strength(-520))
+      .force('link', d3.forceLink<D3Node, D3Link>(d3Links).id((d) => d.id).distance(220))
+      .force('charge', d3.forceManyBody().strength(-1100))
       .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collision', d3.forceCollide<D3Node>().radius((d) => radiusFromNode(d) + 14))
+      .force('collision', d3.forceCollide<D3Node>().radius((d) => radiusFromNode(d) + 28))
       .on('tick', ticked)
     simRef.current = sim
 
@@ -260,12 +291,14 @@ const ForceGraph = forwardRef<ForceGraphHandle, ForceGraphProps>(function ForceG
     }
   }, [nodes, edges, width, height, onSelectCb])
 
-  // ── Visual state updates (path highlight + selection) ──────────────
+  // ── Visual state: path highlight + selection ───────────────────────
   useEffect(() => {
     if (!svgRef.current) return
     const svg = d3.select(svgRef.current)
-    svg.selectAll<SVGLineElement, D3Link>('.links line')
-      .attr('stroke-opacity', (d) => pathEdgeIds.size === 0 || pathEdgeIds.has(d.id) ? 0.55 : 0.07)
+
+    svg.selectAll<SVGPathElement, D3Link>('.links path')
+      .attr('stroke-opacity', (d) => pathEdgeIds.size === 0 || pathEdgeIds.has(d.id) ? 0.45 : 0.07)
+
     svg.selectAll<SVGCircleElement, D3Node>('.nodes circle')
       .attr('opacity', (d) => pathNodeIds.size === 0 || pathNodeIds.has(d.id) ? 1 : 0.18)
       .each(function (d) {
@@ -278,16 +311,26 @@ const ForceGraph = forwardRef<ForceGraphHandle, ForceGraphProps>(function ForceG
             .attr('filter', 'url(#fg-glow)')
         }
       })
+
     svg.selectAll<SVGCircleElement, D3Node>('.halos circle')
-      .attr('r', (d) => selectedNodeId === d.id ? radiusFromNode(d) + 16 : radiusFromNode(d) + 9)
+      .attr('r', (d) => selectedNodeId === d.id ? radiusFromNode(d) + 18 : radiusFromNode(d) + 10)
       .attr('fill', (d) => {
         const c = d3.color(CATEGORY_COLORS[d.category])
-        const opacity = selectedNodeId === d.id ? 0.3 : (pathNodeIds.size === 0 || pathNodeIds.has(d.id) ? 0.12 : 0.03)
+        const opacity = selectedNodeId === d.id ? 0.28 : (pathNodeIds.size === 0 || pathNodeIds.has(d.id) ? 0.1 : 0.02)
         return c?.copy({ opacity }).toString() ?? 'none'
       })
+
+    svg.selectAll<SVGTextElement, D3Node>('.node-abbrevs text')
+      .attr('opacity', (d) => pathNodeIds.size === 0 || pathNodeIds.has(d.id) ? 0.82 : 0.2)
+
+    // Labels: visible only for selected node + path nodes
     svg.selectAll<SVGTextElement, D3Node>('.labels text')
-      .attr('opacity', (d) => pathNodeIds.size === 0 || pathNodeIds.has(d.id) ? 1 : 0.25)
-      .attr('fill', (d) => selectedNodeId === d.id ? '#ffffff' : '#a8d4ea')
+      .attr('opacity', (d) => {
+        if (selectedNodeId === d.id) return 1
+        if (pathNodeIds.size > 0 && pathNodeIds.has(d.id)) return 1
+        return 0
+      })
+      .attr('fill', (d) => selectedNodeId === d.id ? '#ffffff' : '#c8e6f5')
   }, [pathNodeIds, pathEdgeIds, selectedNodeId])
 
   return <svg ref={svgRef} width={width} height={height} style={{ display: 'block' }} />

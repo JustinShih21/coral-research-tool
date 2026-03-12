@@ -1,6 +1,6 @@
 import type { ActorCategory, RelationshipType, InterviewStatus } from '@/types/graph'
 import type { GraphFilters } from '@/hooks/useGraphData'
-import { CATEGORY_COLORS, CATEGORY_LABELS, RELATIONSHIP_STYLE } from './constants'
+import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, RELATIONSHIP_STYLE } from './constants'
 
 const CATEGORIES: ActorCategory[] = [
   'restoration_operator',
@@ -104,7 +104,7 @@ export default function Filters({
               className={`nf-pill ${filters.categories.has(cat) ? 'active' : ''}`}
               onClick={() => setFilters({ ...filters, categories: toggleSet(filters.categories, cat) })}
             >
-              <span className="nf-pill-dot" style={{ background: CATEGORY_COLORS[cat] }} />
+              <span className="nf-pill-icon" style={{ color: CATEGORY_COLORS[cat] }}>{CATEGORY_ICONS[cat]}</span>
               {CATEGORY_LABELS[cat]}
             </button>
           ))}

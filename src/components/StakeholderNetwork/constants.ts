@@ -10,6 +10,27 @@ export const CATEGORY_COLORS: Record<ActorCategory, string> = {
   insurance_finance: '#5B3A8A',
 }
 
+export const CATEGORY_ICONS: Record<ActorCategory, string> = {
+  restoration_operator: '🪸',
+  tourism_dive: '🤿',
+  government: '🏛',
+  investor_funder: '💰',
+  fisheries: '🐟',
+  degradation_driver: '⚠️',
+  insurance_finance: '🛡',
+}
+
+/** Short letter shown inside the SVG node circle (emoji unreliable in SVG). */
+export const CATEGORY_ABBREV: Record<ActorCategory, string> = {
+  restoration_operator: 'R',
+  tourism_dive: 'T',
+  government: 'G',
+  investor_funder: '$',
+  fisheries: 'F',
+  degradation_driver: '!',
+  insurance_finance: 'S',
+}
+
 export const CATEGORY_LABELS: Record<ActorCategory, string> = {
   restoration_operator: 'Restoration',
   tourism_dive: 'Tourism / Dive',

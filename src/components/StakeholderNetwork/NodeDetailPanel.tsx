@@ -1,6 +1,7 @@
 import type { GraphNode, GraphEdge } from '@/types/graph'
 import {
   CATEGORY_COLORS,
+  CATEGORY_ICONS,
   CATEGORY_LABELS,
   DEPENDENCY_SCALE_LABELS,
   FUNDING_ROLE_LABELS,
@@ -17,6 +18,8 @@ interface NodeDetailPanelProps {
   notes?: string
   lastSavedAt?: number | null
   saveStatus?: 'cloud' | 'local' | null
+  /** When false, notes are read-only and show "Log in to save" */
+  canSave?: boolean
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -48,8 +51,9 @@ export default function NodeDetailPanel({
   notes = '',
   lastSavedAt = null,
   saveStatus = null,
+  canSave = true,
 }: NodeDetailPanelProps) {
-  const showSaved = lastSavedAt != null
+  const showSaved = canSave && lastSavedAt != null
   const related = edges.filter((e) => e.source === node.id || e.target === node.id)
   const displayNotes = notes || node.notes
   const fundingRole = FUNDING_ROLE_LABELS[node.funding_role]
@@ -65,6 +69,7 @@ export default function NodeDetailPanel({
       <div className="ndp-header" style={{ borderTopColor: catColor }}>
         <div className="ndp-header-top">
           <span className="ndp-category-badge" style={{ background: `${catColor}1a`, color: catColor }}>
+            <span className="ndp-category-icon">{CATEGORY_ICONS[node.category]}</span>
             {CATEGORY_LABELS[node.category]}
           </span>
           <button type="button" className="ndp-close" onClick={onClose} aria-label="Close">
@@ -173,6 +178,9 @@ export default function NodeDetailPanel({
           <section className="ndp-section ndp-notes-section">
             <div className="ndp-notes-header">
               <h3 className="ndp-section-title">Interview Notes</h3>
+              {!canSave && (
+                <span className="ndp-save-hint">Log in to save notes</span>
+              )}
               {showSaved && (
                 <span className={`ndp-save-indicator ${saveStatus === 'local' ? 'local' : ''}`}>
                   {saveStatus === 'local' ? '● Saved locally' : '✓ Saved'}
@@ -183,7 +191,8 @@ export default function NodeDetailPanel({
               className="ndp-notes-textarea"
               value={displayNotes}
               onChange={(ev) => onNotesChange(node.id, ev.target.value)}
-              placeholder="Add field interview notes, observations, or follow-up items…"
+              placeholder={canSave ? 'Add field interview notes, observations, or follow-up items…' : 'Log in to save notes'}
+              readOnly={!canSave}
               rows={4}
             />
           </section>
