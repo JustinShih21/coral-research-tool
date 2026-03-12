@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import type { BottleneckType } from '@/types/research'
 import { bottleneckTypes as initialBottlenecks } from '@/data/bottlenecks'
+import { useAuth } from '@/contexts/AuthContext'
 import { getResearchData, setResearchData } from '@/lib/researchStorage'
 
 const STORAGE_KEY = 'coral-bottlenecks'
@@ -8,6 +9,7 @@ const STORAGE_KEY = 'coral-bottlenecks'
 const SAVED_INDICATOR_MS = 2000
 
 export default function BottleneckDiagnostic() {
+  const { user } = useAuth()
   const [bottlenecks, setBottlenecks] = useState<BottleneckType[]>(initialBottlenecks)
   const [savedAt, setSavedAt] = useState<number | null>(null)
   const [saveStatus, setSaveStatus] = useState<'cloud' | 'local' | null>(null)
@@ -32,7 +34,7 @@ export default function BottleneckDiagnostic() {
   }, [])
 
   useEffect(() => {
-    if (!isInitialMount.current) {
+    if (!isInitialMount.current && user) {
       setResearchData(STORAGE_KEY, bottlenecks).then((synced) => {
         setSavedAt(Date.now())
         setSaveStatus(synced ? 'cloud' : 'local')
@@ -48,7 +50,7 @@ export default function BottleneckDiagnostic() {
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
     }
-  }, [bottlenecks])
+  }, [bottlenecks, user])
 
   const setSeverity = (id: string, severity: number) => {
     setBottlenecks((prev) =>
@@ -68,7 +70,8 @@ export default function BottleneckDiagnostic() {
     <div className="bottleneck-diagnostic">
       <h1>Bottleneck Diagnostic</h1>
       <p className="bottleneck-intro">
-        Score each structural barrier 0-5 (0 = not relevant, 5 = dominant barrier). Scores are saved in this browser.
+        Score each structural barrier 0-5 (0 = not relevant, 5 = dominant barrier).
+        {!user && <span className="auth-hint"> Log in to save scores.</span>}
         {savedAt != null && (
           <span className={`save-indicator ${saveStatus === 'local' ? 'save-local' : ''}`}>
             {saveStatus === 'local' ? 'Saved locally' : 'Saved'}

@@ -19,11 +19,13 @@ export async function getResearchData<T>(key: string): Promise<T | null> {
   return getFromLocalStorage<T>(key)
 }
 
-/** Returns true if saved to cloud (or Supabase not configured), false if Supabase write failed. */
+/** Returns true if saved to cloud (or Supabase not configured), false if only local or write failed. */
 export async function setResearchData(key: string, value: unknown): Promise<boolean> {
   const payload = { key, value: value ?? {}, updated_at: new Date().toISOString() }
   setToLocalStorage(key, value)
   if (!isSupabaseConfigured() || !supabase) return true
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return false
   const { error } = await supabase.from(TABLE).upsert(payload, { onConflict: 'key' })
   if (error) {
     console.warn('[researchStorage] Supabase set failed, falling back to localStorage:', error.message)

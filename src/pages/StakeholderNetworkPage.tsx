@@ -5,11 +5,13 @@ import Legend from '@/components/StakeholderNetwork/Legend'
 import Filters from '@/components/StakeholderNetwork/Filters'
 import { stakeholderGraph } from '@/data/stakeholders'
 import { useGraphData, defaultFilters, type GraphFilters } from '@/hooks/useGraphData'
+import { useAuth } from '@/contexts/AuthContext'
 import { getResearchData, setResearchData } from '@/lib/researchStorage'
 
 const STORAGE_KEY_NOTES = 'coral-network-notes'
 
 export default function StakeholderNetworkPage() {
+  const { user } = useAuth()
   const [filters, setFilters] = useState<GraphFilters>(defaultFilters)
   const [pathFrom, setPathFrom] = useState<string | null>(null)
   const [pathTo, setPathTo] = useState<string | null>(null)
@@ -46,18 +48,20 @@ export default function StakeholderNetworkPage() {
   const handleNotesChange = useCallback((nodeId: string, notes: string) => {
     setNodeNotes((prev) => {
       const next = { ...prev, [nodeId]: notes }
-      setResearchData(STORAGE_KEY_NOTES, next).then((synced) => {
-        setSavedAt(Date.now())
-        setSaveStatus(synced ? 'cloud' : 'local')
-        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
-        saveTimeoutRef.current = setTimeout(() => {
-          setSavedAt(null)
-          setSaveStatus(null)
-        }, 2000)
-      })
+      if (user) {
+        setResearchData(STORAGE_KEY_NOTES, next).then((synced) => {
+          setSavedAt(Date.now())
+          setSaveStatus(synced ? 'cloud' : 'local')
+          if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+          saveTimeoutRef.current = setTimeout(() => {
+            setSavedAt(null)
+            setSaveStatus(null)
+          }, 2000)
+        })
+      }
       return next
     })
-  }, [])
+  }, [user])
 
   useEffect(() => () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current) }, [])
 
@@ -153,9 +157,11 @@ export default function StakeholderNetworkPage() {
             <button type="button" onClick={() => graphRef.current?.resetZoom()} aria-label="Reset zoom" title="Reset zoom">⊙</button>
             <button type="button" onClick={() => graphRef.current?.zoomIn()} aria-label="Zoom in" title="Zoom in">+</button>
           </div>
-          <button type="button" className="network-export-btn" onClick={handleExport}>
-            Export JSON
-          </button>
+          {user && (
+            <button type="button" className="network-export-btn" onClick={handleExport}>
+              Export JSON
+            </button>
+          )}
         </div>
       </div>
 
@@ -212,6 +218,7 @@ export default function StakeholderNetworkPage() {
               notes={nodeNotes[selectedNode.id]}
               lastSavedAt={savedAt}
               saveStatus={saveStatus}
+              canSave={!!user}
             />
           )}
         </aside>

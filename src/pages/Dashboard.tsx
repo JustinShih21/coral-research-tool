@@ -9,6 +9,7 @@ import {
   analyticalQuestions,
   expectedOutcomes,
 } from '@/data/researchFramework'
+import { useAuth } from '@/contexts/AuthContext'
 import { getResearchData, setResearchData, RESEARCH_KEYS } from '@/lib/researchStorage'
 
 const CURRENT_PHASE_ID = 1
@@ -39,6 +40,7 @@ function isValidBackup(obj: unknown): obj is Record<string, unknown> {
 }
 
 export default function Dashboard() {
+  const { user } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null)
   const [expandedPhases, setExpandedPhases] = useState<Set<number>>(
@@ -62,6 +64,10 @@ export default function Dashboard() {
     const file = ev.target.files?.[0]
     ev.target.value = ''
     if (!file) return
+    if (!user) {
+      setRestoreMessage('Log in to restore a backup.')
+      return
+    }
     const reader = new FileReader()
     reader.onload = async () => {
       try {
@@ -219,29 +225,31 @@ export default function Dashboard() {
           )
         })}
       </div>
-      <section className="backup-restore">
-        <h2>Backup / Restore</h2>
-        <p className="backup-restore-intro">
-          Download all saved data (stakeholder notes, hypotheses, interview notes, bottleneck scores) to a file, or restore from a previous backup.
-        </p>
-        <div className="backup-restore-actions">
-          <button type="button" className="backup-btn" onClick={() => downloadBackup()}>
-            Download backup
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json,application/json"
-            className="backup-file-input"
-            aria-hidden
-            onChange={handleRestoreFile}
-          />
-          <button type="button" className="restore-btn" onClick={handleRestoreClick}>
-            Restore from file
-          </button>
-        </div>
-        {restoreMessage && <p className="backup-restore-message">{restoreMessage}</p>}
-      </section>
+      {user && (
+        <section className="backup-restore">
+          <h2>Backup / Restore</h2>
+          <p className="backup-restore-intro">
+            Download all saved data (stakeholder notes, hypotheses, interview notes, bottleneck scores) to a file, or restore from a previous backup.
+          </p>
+          <div className="backup-restore-actions">
+            <button type="button" className="backup-btn" onClick={() => downloadBackup()}>
+              Download backup
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json,application/json"
+              className="backup-file-input"
+              aria-hidden
+              onChange={handleRestoreFile}
+            />
+            <button type="button" className="restore-btn" onClick={handleRestoreClick}>
+              Restore from file
+            </button>
+          </div>
+          {restoreMessage && <p className="backup-restore-message">{restoreMessage}</p>}
+        </section>
+      )}
     </div>
   )
 }

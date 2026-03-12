@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import type { Hypothesis } from '@/types/research'
 import { hypotheses as initialHypotheses } from '@/data/hypotheses'
+import { useAuth } from '@/contexts/AuthContext'
 import { getResearchData, setResearchData } from '@/lib/researchStorage'
 
 const STORAGE_KEY = 'coral-hypotheses'
@@ -8,6 +9,7 @@ const STORAGE_KEY = 'coral-hypotheses'
 const SAVED_INDICATOR_MS = 2000
 
 export default function HypothesisTracker() {
+  const { user } = useAuth()
   const [hypotheses, setHypotheses] = useState<Hypothesis[]>(initialHypotheses)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [addEvidenceFor, setAddEvidenceFor] = useState<string | null>(null)
@@ -35,7 +37,7 @@ export default function HypothesisTracker() {
   }, [])
 
   useEffect(() => {
-    if (!isInitialMount.current) {
+    if (!isInitialMount.current && user) {
       setResearchData(STORAGE_KEY, hypotheses).then((synced) => {
         setSavedAt(Date.now())
         setSaveStatus(synced ? 'cloud' : 'local')
@@ -51,7 +53,7 @@ export default function HypothesisTracker() {
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
     }
-  }, [hypotheses])
+  }, [hypotheses, user])
 
   const addEvidence = useCallback(
     (hypId: string) => {
@@ -96,7 +98,8 @@ export default function HypothesisTracker() {
     <div className="hypothesis-tracker">
       <h1>Hypothesis Tracker</h1>
       <p className="tracker-intro">
-        Track evidence from field interviews against the core institutional hypotheses (H1-H4). Evidence is saved in this browser.
+        Track evidence from field interviews against the core institutional hypotheses (H1-H4).
+        {!user && <span className="auth-hint"> Log in to save evidence.</span>}
         {savedAt != null && (
           <span className={`save-indicator ${saveStatus === 'local' ? 'save-local' : ''}`}>
             {saveStatus === 'local' ? 'Saved locally' : 'Saved'}

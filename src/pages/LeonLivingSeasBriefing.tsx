@@ -9,6 +9,7 @@ import {
   leonSourceFiles,
   type ToolConcept,
 } from '@/data/leonLivingSeas'
+import { useAuth } from '@/contexts/AuthContext'
 import { getResearchData, setResearchData } from '@/lib/researchStorage'
 
 const STORAGE_KEY = 'coral-leon-briefing'
@@ -29,6 +30,7 @@ function isSavedState(value: unknown): value is SavedState {
 }
 
 export default function LeonLivingSeasBriefing() {
+  const { user } = useAuth()
   const [tab, setTab] = useState<Tab>('briefing')
   const [toolFilter, setToolFilter] = useState<ToolFilter>('all')
   const [search, setSearch] = useState('')
@@ -59,6 +61,7 @@ export default function LeonLivingSeasBriefing() {
       isInitialMount.current = false
       return
     }
+    if (!user) return
     const payload: SavedState = { checkedQuestions, questionNotes, meetingNotes }
     setResearchData(STORAGE_KEY, payload).then((synced) => {
       setSavedAt(Date.now())
@@ -72,7 +75,7 @@ export default function LeonLivingSeasBriefing() {
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
     }
-  }, [checkedQuestions, questionNotes, meetingNotes])
+  }, [checkedQuestions, questionNotes, meetingNotes, user])
 
   const totalQuestions = interviewSections.reduce((sum, section) => sum + section.questions.length, 0)
   const doneQuestions = Object.values(checkedQuestions).filter(Boolean).length
@@ -102,6 +105,7 @@ export default function LeonLivingSeasBriefing() {
       <h1>Leon + Living Seas Briefing</h1>
       <p className="leon-intro">
         Consolidated briefing from Living Seas and related field notes, with interview prep and tool options.
+        {!user && <span className="auth-hint"> Log in to save progress.</span>}
         {savedAt != null && (
           <span className={`save-indicator ${saveStatus === 'local' ? 'save-local' : ''}`}>
             {saveStatus === 'local' ? 'Saved locally' : 'Saved'}
