@@ -4,7 +4,6 @@ import Layout from './components/Layout'
 import { TeamOnlyRoute } from './components/TeamOnlyGate'
 import Dashboard from './pages/Dashboard'
 import StakeholderNetworkPage from './pages/StakeholderNetworkPage'
-import FundingFlows from './pages/FundingFlows'
 import HypothesisTracker from './pages/HypothesisTracker'
 import InterviewProtocol from './pages/InterviewProtocol'
 import CaseStudies from './pages/CaseStudies'
@@ -24,7 +23,6 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/network" element={<StakeholderNetworkPage />} />
-              <Route path="/funding" element={<FundingFlows />} />
               <Route path="/hypotheses" element={<TeamOnlyRoute><HypothesisTracker /></TeamOnlyRoute>} />
               <Route path="/interview" element={<TeamOnlyRoute><InterviewProtocol /></TeamOnlyRoute>} />
               <Route path="/cases" element={<CaseStudies />} />

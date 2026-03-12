@@ -27,7 +27,6 @@ Output is in `dist/`.
 
 - **Dashboard** — Research phases and key activities
 - **Stakeholder Network** — Interactive D3 force-directed graph: filter by category, relationship type, interview status; path highlight between two nodes; click a node for detail panel and interview notes; export graph as JSON
-- **Funding Flows** — Table of current funding channels from the graph
 - **Hypothesis Tracker** — H1–H4 with add/remove evidence (synced to Supabase)
 - **Interview Protocol** — Question guides by stakeholder type with note fields (synced to Supabase)
 - **Case Studies** — Louisiana wetlands, Wildfire, Mangroves

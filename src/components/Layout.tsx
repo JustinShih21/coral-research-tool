@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, Fragment } from 'react'
 import { Outlet, NavLink, Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
+import { SIDEBAR_IMAGE } from '@/data/imageAssets'
 
 export default function Layout({ children }: { children?: React.ReactNode }) {
   const mainRef = useRef<HTMLElement>(null)
@@ -24,7 +25,6 @@ export default function Layout({ children }: { children?: React.ReactNode }) {
     { to: '/cases', label: 'Case Studies' },
     { to: '/library', label: 'Research Library' },
     { to: '/contacts', label: 'Contacts' },
-    { to: '/funding', label: 'Funding Flows' },
     { to: '/network', label: 'Stakeholder Network' },
   ]
 
@@ -33,7 +33,6 @@ export default function Layout({ children }: { children?: React.ReactNode }) {
     { to: '/cases', label: 'Case Studies' },
     { to: '/library', label: 'Research Library' },
     { to: '/contacts', label: 'Contacts' },
-    { to: '/funding', label: 'Funding Flows' },
     { to: '/network', label: 'Stakeholder Network' },
     { to: '/hypotheses', label: 'Hypothesis Tracker' },
     { to: '/interview', label: 'Interview Protocol' },
@@ -42,7 +41,7 @@ export default function Layout({ children }: { children?: React.ReactNode }) {
   ]
 
   const navItems = user ? fullNav : publicNav
-  const teamOnlyStartIndex = 6
+  const teamOnlyStartIndex = publicNav.length
 
   return (
     <div className="layout">
@@ -60,6 +59,11 @@ export default function Layout({ children }: { children?: React.ReactNode }) {
             </Fragment>
           ))}
         </nav>
+        <div
+          className="sidebar-brand"
+          style={{ backgroundImage: `url(${SIDEBAR_IMAGE})` }}
+          aria-hidden
+        />
       </aside>
       <main ref={mainRef} className="main">
         <div className="main-header">
