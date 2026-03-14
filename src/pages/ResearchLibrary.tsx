@@ -6,6 +6,7 @@ import type { LibraryDocument } from '@/types/library'
 import { LIBRARY_IMAGE } from '@/data/imageAssets'
 
 const LIBRARY_EXTRA_KEY = 'library-documents-extra'
+const LIBRARY_IMAGE_CANDIDATES = ['/images/library/library.jpg', LIBRARY_IMAGE, '/reef.svg'] as const
 
 type Tab = 'documents' | 'readings' | 'recordings'
 
@@ -27,6 +28,7 @@ export default function ResearchLibrary() {
   const [tab, setTab] = useState<Tab>('documents')
   const [topicFilter, setTopicFilter] = useState<string>('')
   const [search, setSearch] = useState('')
+  const [libraryImageIndex, setLibraryImageIndex] = useState(0)
 
   const [extraDocuments, setExtraDocuments] = useState<LibraryDocument[]>([])
   useEffect(() => {
@@ -87,16 +89,25 @@ export default function ResearchLibrary() {
   }
 
   const isExtraDoc = (id: string) => extraDocuments.some((d) => d.id === id)
+  const libraryImageSrc =
+    LIBRARY_IMAGE_CANDIDATES[Math.min(libraryImageIndex, LIBRARY_IMAGE_CANDIDATES.length - 1)]
+  const handleLibraryImageError = () =>
+    setLibraryImageIndex((prev) =>
+      prev < LIBRARY_IMAGE_CANDIDATES.length - 1 ? prev + 1 : prev
+    )
 
   return (
     <div className="research-library">
       <header className="library-header">
-        <div
-          className="library-header-bg"
-          style={{ backgroundImage: `url(${LIBRARY_IMAGE})` }}
-          role="img"
-          aria-label="Research and coral reef"
-        />
+        <div className="library-header-bg" role="img" aria-label="Research and coral reef">
+          <img
+            src={libraryImageSrc}
+            alt=""
+            aria-hidden
+            className="library-header-bg-img"
+            onError={handleLibraryImageError}
+          />
+        </div>
         <span className="library-header-overlay" aria-hidden />
         <div className="library-header-content">
           <h1>Research Library</h1>

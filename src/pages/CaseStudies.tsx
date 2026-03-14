@@ -1,8 +1,14 @@
-import { useState } from 'react'
+import { useState, type SyntheticEvent } from 'react'
 import { caseStudies } from '@/data/caseStudies'
 
 export default function CaseStudies() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const handleImageError = (ev: SyntheticEvent<HTMLImageElement>) => {
+    const img = ev.currentTarget
+    if (img.dataset.fallbackApplied === 'true') return
+    img.dataset.fallbackApplied = 'true'
+    img.src = '/reef.svg'
+  }
 
   return (
     <div className="case-studies">
@@ -18,7 +24,7 @@ export default function CaseStudies() {
           >
             {c.image && (
               <div className="case-card-image">
-                <img src={c.image.url} alt={c.image.alt} loading="lazy" />
+                <img src={c.image.url} alt={c.image.alt} loading="lazy" onError={handleImageError} />
                 {c.image.credit && <span className="photo-credit">{c.image.credit}</span>}
               </div>
             )}
