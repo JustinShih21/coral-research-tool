@@ -64,3 +64,46 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
+-- ---------------------------------------------------------------------------
+-- Storage: public team photos (Manage team → Upload image)
+-- Run this block in the same project. Bucket is public so URLs work on the site;
+-- only authenticated users may upload/update/delete (see policies below).
+-- ---------------------------------------------------------------------------
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'team-photos',
+  'team-photos',
+  true,
+  5242880,
+  array['image/jpeg', 'image/png', 'image/webp', 'image/gif']::text[]
+)
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "Public read team photos" on storage.objects;
+create policy "Public read team photos"
+  on storage.objects for select
+  using (bucket_id = 'team-photos');
+
+drop policy if exists "Authenticated insert team photos" on storage.objects;
+create policy "Authenticated insert team photos"
+  on storage.objects for insert
+  to authenticated
+  with check (bucket_id = 'team-photos');
+
+drop policy if exists "Authenticated update team photos" on storage.objects;
+create policy "Authenticated update team photos"
+  on storage.objects for update
+  to authenticated
+  using (bucket_id = 'team-photos')
+  with check (bucket_id = 'team-photos');
+
+drop policy if exists "Authenticated delete team photos" on storage.objects;
+create policy "Authenticated delete team photos"
+  on storage.objects for delete
+  to authenticated
+  using (bucket_id = 'team-photos');
