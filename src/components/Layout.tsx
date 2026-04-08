@@ -13,22 +13,18 @@ export default function Layout({ children }: { children?: React.ReactNode }) {
 
   const publicNav = [
     { to: '/', label: 'Home' },
+    { to: '/reef-health', label: 'Reef Health' },
     { to: '/donate', label: 'Donate' },
-    { to: '/research', label: 'Research Plan' },
-    { to: '/cases', label: 'Case Studies' },
     { to: '/library', label: 'Research Library' },
     { to: '/network', label: 'Stakeholder Network' },
-    { to: '/contacts', label: 'Contacts' },
   ]
 
   const fullNav = [
     { to: '/', label: 'Home' },
+    { to: '/reef-health', label: 'Reef Health' },
     { to: '/donate', label: 'Donate' },
-    { to: '/research', label: 'Research Plan' },
-    { to: '/cases', label: 'Case Studies' },
     { to: '/library', label: 'Research Library' },
     { to: '/network', label: 'Stakeholder Network' },
-    { to: '/contacts', label: 'Contacts' },
     { to: '/hypotheses', label: 'Hypothesis Tracker' },
     { to: '/interview', label: 'Interview Protocol' },
     { to: '/leon-living-seas', label: 'Leon + Living Seas' },

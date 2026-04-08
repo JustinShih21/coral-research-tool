@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "update:noaa": "node scripts/update_noaa_crw_snapshot.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.1",

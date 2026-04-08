@@ -1,0 +1,13 @@
+{
+  "asOfDate": "2026-04-06",
+  "sourceUrl": "https://coralreefwatch.noaa.gov/product/vs/data.php",
+  "stationCountsByLevel": {
+    "noStress": 99,
+    "watch": 77,
+    "warning": 21,
+    "alert1": 0,
+    "alert2": 0,
+    "unknown": 22
+  },
+  "stressIndex01": 0.1793
+}

@@ -11,7 +11,6 @@ import {
 } from '@/data/researchFramework'
 import { useAuth } from '@/contexts/AuthContext'
 import { getResearchData, setResearchData, RESEARCH_KEYS } from '@/lib/researchStorage'
-import CoralReefCanvas from '@/components/CoralReefCanvas'
 
 const CURRENT_PHASE_ID = 1
 
@@ -107,12 +106,8 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard">
-      <CoralReefCanvas
-        title="Research Program Dashboard"
-        subtitle="Indonesia Coral Reef Financing Research"
-        variant="full"
-        titleLevel={1}
-      />
+      <h1>Research Program Dashboard</h1>
+      <p className="dashboard-intro">Indonesia coral reef financing research workspace.</p>
       <section className="dashboard-panel">
         <h2>Project Mission</h2>
         {projectMission.map((statement) => (

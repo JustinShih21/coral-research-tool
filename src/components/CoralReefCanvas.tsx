@@ -21,60 +21,47 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
+import {
+  EVENT_YEARS as GLOBAL_EVENT_YEARS,
+  FIRST_YEAR as GLOBAL_FIRST_YEAR,
+  LAST_YEAR as GLOBAL_LAST_YEAR,
+  LAST_GCRMN_COVER_YEAR,
+  reefHealthAtYear,
+} from '@/data/reefHealthGlobal'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
+
+type CanvasMode = 'reef-health' | 'reef-star-growth'
 
 interface CoralReefCanvasProps {
   title?: string
   subtitle?: string
   variant?: string
   titleLevel?: number
+  mode?: CanvasMode
 }
 
-// ─── Health timeline ──────────────────────────────────────────────────────────
+// ─── Timeline helpers ─────────────────────────────────────────────────────────
 
-interface HealthPoint { year: number; health: number; event?: string }
+const STAR_FIRST = 0
+const STAR_LAST = 4
+const STAR_SPAN = STAR_LAST - STAR_FIRST
+const STAR_TICKS = [0, 1, 2, 3, 4] as const
 
-const TIMELINE: HealthPoint[] = [
-  { year: 1950, health: 100 },
-  { year: 1960, health: 97 },
-  { year: 1968, health: 93, event: 'Crown-of-Thorns Starfish Outbreak — GBR' },
-  { year: 1975, health: 88 },
-  { year: 1980, health: 84 },
-  { year: 1983, health: 80, event: 'El Niño Bleaching — First Recorded Mass Event' },
-  { year: 1987, health: 77 },
-  { year: 1990, health: 74 },
-  { year: 1995, health: 68 },
-  { year: 1998, health: 55, event: '1998 El Niño — First Global Bleaching Crisis' },
-  { year: 1999, health: 63 },
-  { year: 2000, health: 78 },
-  { year: 2002, health: 62, event: 'Widespread Bleaching — Indian Ocean & Pacific' },
-  { year: 2003, health: 67 },
-  { year: 2010, health: 57, event: 'Global Bleaching Event' },
-  { year: 2012, health: 63 },
-  { year: 2016, health: 38, event: 'Mass Bleaching — 50% of Great Barrier Reef' },
-  { year: 2017, health: 44 },
-  { year: 2020, health: 41, event: 'Global Bleaching Continues' },
-  { year: 2022, health: 49 },
-  { year: 2024, health: 34, event: 'Record Ocean Temperatures' },
-]
-const FIRST_YEAR = 1950
-const LAST_YEAR  = 2024
-const YEAR_SPAN  = LAST_YEAR - FIRST_YEAR
-const EVENT_YEARS = TIMELINE.filter(p => p.event)
+function easeInOutCubic(t: number) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+}
 
-function healthAtYear(year: number): number {
-  const y = Math.max(FIRST_YEAR, Math.min(LAST_YEAR, year))
-  let lo = TIMELINE[0], hi = TIMELINE[TIMELINE.length - 1]
-  for (let i = 0; i < TIMELINE.length - 1; i++) {
-    if (y >= TIMELINE[i].year && y <= TIMELINE[i + 1].year) {
-      lo = TIMELINE[i]; hi = TIMELINE[i + 1]; break
-    }
-  }
-  const segLen = hi.year - lo.year
-  const t = segLen === 0 ? 0 : (y - lo.year) / segLen
-  const te = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
-  return lo.health + (hi.health - lo.health) * te
+function growthHealthAtAge(ageYears: number): number {
+  // 0 → 4 years since installation, eased so early changes feel visible.
+  const a = Math.max(STAR_FIRST, Math.min(STAR_LAST, ageYears))
+  const t = STAR_SPAN === 0 ? 0 : (a - STAR_FIRST) / STAR_SPAN
+  return 100 * easeInOutCubic(t)
+}
+
+function reefHealthIndexAtYear(year: number): { health: number; noaaAsOfDate?: string } {
+  const sample = reefHealthAtYear(year)
+  return { health: sample.health, noaaAsOfDate: sample.noaaAsOfDate }
 }
 
 // ─── Scene constants ──────────────────────────────────────────────────────────
@@ -141,7 +128,12 @@ function lerpColor(a: string, b: string, t: number): string {
   const [r2, g2, b2] = hexToRgb(b)
   return `rgb(${Math.round(r1 + (r2 - r1) * tc)},${Math.round(g1 + (g2 - g1) * tc)},${Math.round(b1 + (b2 - b1) * tc)})`
 }
-function coralColor(colorIndex: number, health: number): string {
+const RUBBLE_COLOR = '#2a2a2d'
+function coralColor(mode: CanvasMode, colorIndex: number, health: number): string {
+  if (mode === 'reef-star-growth') {
+    const t = Math.max(0, Math.min(1, health / 100))
+    return lerpColor(RUBBLE_COLOR, HEALTHY_COLORS[colorIndex % 4], t)
+  }
   const t = Math.max(0, Math.min(1, (100 - health) / 50))
   return lerpColor(HEALTHY_COLORS[colorIndex % 4], BLEACH_COLOR, t)
 }
@@ -335,10 +327,10 @@ function generateScene(w: number, h: number): Scene {
   if (!bloomCtx) throw new Error('2D context unavailable')
 
   const colorCache: ColorCache = [
-    coralColor(0, 100),
-    coralColor(1, 100),
-    coralColor(2, 100),
-    coralColor(3, 100),
+    coralColor('reef-health', 0, 100),
+    coralColor('reef-health', 1, 100),
+    coralColor('reef-health', 2, 100),
+    coralColor('reef-health', 3, 100),
   ]
 
   return {
@@ -457,8 +449,9 @@ function addFishBodyToPath(
   t: number,
   viewCos: number,
   viewSin: number,
-  cx: number,
-  cy: number
+  ox: number,
+  oy: number,
+  zoom: number
 ): void {
   const rx = fish[base + 0]
   const rz = fish[base + 1]
@@ -492,14 +485,14 @@ function addFishBodyToPath(
   const sc = zc > 1 ? FOV / zc : 0.002
   const sh = zhc > 1 ? FOV / zhc : 0.002
 
-  const sx = cx + x * sc
-  const sy = cy - y * sc
-  const shx = cx + hx * sh
-  const shy = cy - y * sh
+  const sx = ox + x * sc * zoom
+  const sy = oy - y * sc * zoom
+  const shx = ox + hx * sh * zoom
+  const shy = oy - y * sh * zoom
 
   const ang = Math.atan2(shy - sy, shx - sx)
-  const rX = Math.max(0.8, (bodyLen * 0.5) * sc)
-  const rY = Math.max(0.5, (bodyH * 0.5) * sc)
+  const rX = Math.max(0.8, (bodyLen * 0.5) * sc * zoom)
+  const rY = Math.max(0.5, (bodyH * 0.5) * sc * zoom)
 
   // Body ellipse.
   ctx.ellipse(sx, sy, rX, rY, ang, 0, TAU)
@@ -525,8 +518,9 @@ function addFishEyeToPath(
   t: number,
   viewCos: number,
   viewSin: number,
-  cx: number,
-  cy: number
+  ox: number,
+  oy: number,
+  zoom: number
 ): void {
   const rx = fish[base + 0]
   const rz = fish[base + 1]
@@ -557,14 +551,14 @@ function addFishEyeToPath(
   const zhc = hz + FOV
   const sc = zc > 1 ? FOV / zc : 0.002
   const sh = zhc > 1 ? FOV / zhc : 0.002
-  const sx = cx + x * sc
-  const sy = cy - y * sc
-  const shx = cx + hx * sh
-  const shy = cy - y * sh
+  const sx = ox + x * sc * zoom
+  const sy = oy - y * sc * zoom
+  const shx = ox + hx * sh * zoom
+  const shy = oy - y * sh * zoom
 
   const ang = Math.atan2(shy - sy, shx - sx)
-  const rX = Math.max(0.8, (bodyLen * 0.5) * sc)
-  const rY = Math.max(0.5, (bodyH * 0.5) * sc)
+  const rX = Math.max(0.8, (bodyLen * 0.5) * sc * zoom)
+  const rY = Math.max(0.5, (bodyH * 0.5) * sc * zoom)
 
   const px = -Math.sin(ang)
   const py = Math.cos(ang)
@@ -579,11 +573,17 @@ function drawFrame(
   ctx: CanvasRenderingContext2D,
   scene: Scene,
   t: number,
-  health: number
+  health: number,
+  mode: CanvasMode,
+  zoom: number,
+  panX: number,
+  panY: number
 ): void {
   const { w, h, geom, proj, groupStart } = scene
   const cx   = w / 2
   const cy   = h * 0.50
+  const ox = cx + panX
+  const oy = cy + panY
   const rotY = (t / ROT_PERIOD) * TAU
 
   scene.frame++
@@ -595,10 +595,10 @@ function drawFrame(
   // Cache health-driven styles (only changes while scrubbing the slider).
   const healthKey = Math.round(health)
   if (healthKey !== scene.lastHealthKey) {
-    scene.colorCache[0] = coralColor(0, health)
-    scene.colorCache[1] = coralColor(1, health)
-    scene.colorCache[2] = coralColor(2, health)
-    scene.colorCache[3] = coralColor(3, health)
+    scene.colorCache[0] = coralColor(mode, 0, health)
+    scene.colorCache[1] = coralColor(mode, 1, health)
+    scene.colorCache[2] = coralColor(mode, 2, health)
+    scene.colorCache[3] = coralColor(mode, 3, health)
     scene.lastHealthKey = healthKey
   }
   if (healthKey !== scene.lastBloomHealthKey) {
@@ -611,7 +611,14 @@ function drawFrame(
   const s = Math.sin(rotY)
 
   // Branch thinning (tissue loss) as health declines.
-  const thicknessMult = 0.5 + 0.5 * (health / 100)
+  const thicknessMult = mode === 'reef-star-growth'
+    ? (0.22 + 0.98 * (health / 100))
+    : (0.5 + 0.5 * (health / 100))
+
+  // Growth mode: reveal more branch structure over time (density increases with growth).
+  const visibleFrac = mode === 'reef-star-growth'
+    ? Math.max(0.08, Math.min(1, 0.08 + 0.92 * Math.pow(health / 100, 1.25)))
+    : 1
 
   // Rotate + project (zero allocations).
   let th0 = 0, th1 = 0, th2 = 0, th3 = 0
@@ -620,7 +627,16 @@ function drawFrame(
   const count2 = groupStart[3] - groupStart[2]
   const count3 = groupStart[4] - groupStart[3]
 
-  for (let i = groupStart[0]; i < groupStart[1]; i++) {
+  const end0 = groupStart[0] + Math.max(1, Math.floor(count0 * visibleFrac))
+  const end1 = groupStart[1] + Math.max(1, Math.floor(count1 * visibleFrac))
+  const end2 = groupStart[2] + Math.max(1, Math.floor(count2 * visibleFrac))
+  const end3 = groupStart[3] + Math.max(1, Math.floor(count3 * visibleFrac))
+  const vEnd0 = Math.min(groupStart[1], end0)
+  const vEnd1 = Math.min(groupStart[2], end1)
+  const vEnd2 = Math.min(groupStart[3], end2)
+  const vEnd3 = Math.min(groupStart[4], end3)
+
+  for (let i = groupStart[0]; i < vEnd0; i++) {
     const gi = i * 8
     const pi = i * 5
     const p1x = geom[gi + 0], p1y = geom[gi + 1], p1z = geom[gi + 2]
@@ -639,16 +655,16 @@ function drawFrame(
     const s2 = z2 > 1 ? FOV / z2 : 0.002
     const sAvg = (s1 + s2) * 0.5
 
-    proj[pi + 0] = cx + rp1x * s1
-    proj[pi + 1] = cy - p1y * s1
-    proj[pi + 2] = cx + rp2x * s2
-    proj[pi + 3] = cy - p2y * s2
+    proj[pi + 0] = ox + rp1x * s1 * zoom
+    proj[pi + 1] = oy - p1y * s1 * zoom
+    proj[pi + 2] = ox + rp2x * s2 * zoom
+    proj[pi + 3] = oy - p2y * s2 * zoom
     proj[pi + 4] = midZ
 
     th0 += tBase * sAvg
   }
 
-  for (let i = groupStart[1]; i < groupStart[2]; i++) {
+  for (let i = groupStart[1]; i < vEnd1; i++) {
     const gi = i * 8
     const pi = i * 5
     const p1x = geom[gi + 0], p1y = geom[gi + 1], p1z = geom[gi + 2]
@@ -667,16 +683,16 @@ function drawFrame(
     const s2 = z2 > 1 ? FOV / z2 : 0.002
     const sAvg = (s1 + s2) * 0.5
 
-    proj[pi + 0] = cx + rp1x * s1
-    proj[pi + 1] = cy - p1y * s1
-    proj[pi + 2] = cx + rp2x * s2
-    proj[pi + 3] = cy - p2y * s2
+    proj[pi + 0] = ox + rp1x * s1 * zoom
+    proj[pi + 1] = oy - p1y * s1 * zoom
+    proj[pi + 2] = ox + rp2x * s2 * zoom
+    proj[pi + 3] = oy - p2y * s2 * zoom
     proj[pi + 4] = midZ
 
     th1 += tBase * sAvg
   }
 
-  for (let i = groupStart[2]; i < groupStart[3]; i++) {
+  for (let i = groupStart[2]; i < vEnd2; i++) {
     const gi = i * 8
     const pi = i * 5
     const p1x = geom[gi + 0], p1y = geom[gi + 1], p1z = geom[gi + 2]
@@ -695,16 +711,16 @@ function drawFrame(
     const s2 = z2 > 1 ? FOV / z2 : 0.002
     const sAvg = (s1 + s2) * 0.5
 
-    proj[pi + 0] = cx + rp1x * s1
-    proj[pi + 1] = cy - p1y * s1
-    proj[pi + 2] = cx + rp2x * s2
-    proj[pi + 3] = cy - p2y * s2
+    proj[pi + 0] = ox + rp1x * s1 * zoom
+    proj[pi + 1] = oy - p1y * s1 * zoom
+    proj[pi + 2] = ox + rp2x * s2 * zoom
+    proj[pi + 3] = oy - p2y * s2 * zoom
     proj[pi + 4] = midZ
 
     th2 += tBase * sAvg
   }
 
-  for (let i = groupStart[3]; i < groupStart[4]; i++) {
+  for (let i = groupStart[3]; i < vEnd3; i++) {
     const gi = i * 8
     const pi = i * 5
     const p1x = geom[gi + 0], p1y = geom[gi + 1], p1z = geom[gi + 2]
@@ -723,26 +739,31 @@ function drawFrame(
     const s2 = z2 > 1 ? FOV / z2 : 0.002
     const sAvg = (s1 + s2) * 0.5
 
-    proj[pi + 0] = cx + rp1x * s1
-    proj[pi + 1] = cy - p1y * s1
-    proj[pi + 2] = cx + rp2x * s2
-    proj[pi + 3] = cy - p2y * s2
+    proj[pi + 0] = ox + rp1x * s1 * zoom
+    proj[pi + 1] = oy - p1y * s1 * zoom
+    proj[pi + 2] = ox + rp2x * s2 * zoom
+    proj[pi + 3] = oy - p2y * s2 * zoom
     proj[pi + 4] = midZ
 
     th3 += tBase * sAvg
   }
 
-  const avgTh0 = count0 > 0 ? (th0 / count0) * thicknessMult : 1
-  const avgTh1 = count1 > 0 ? (th1 / count1) * thicknessMult : 1
-  const avgTh2 = count2 > 0 ? (th2 / count2) * thicknessMult : 1
-  const avgTh3 = count3 > 0 ? (th3 / count3) * thicknessMult : 1
+  const vCount0 = vEnd0 - groupStart[0]
+  const vCount1 = vEnd1 - groupStart[1]
+  const vCount2 = vEnd2 - groupStart[2]
+  const vCount3 = vEnd3 - groupStart[3]
+
+  const avgTh0 = vCount0 > 0 ? (th0 / vCount0) * thicknessMult : 1
+  const avgTh1 = vCount1 > 0 ? (th1 / vCount1) * thicknessMult : 1
+  const avgTh2 = vCount2 > 0 ? (th2 / vCount2) * thicknessMult : 1
+  const avgTh3 = vCount3 > 0 ? (th3 / vCount3) * thicknessMult : 1
 
   // Depth sort (back → front) within each color group every 3rd frame.
   if (scene.frame % 3 === 0) {
-    insertionSortByMidZ(geom, proj, groupStart[0], groupStart[1])
-    insertionSortByMidZ(geom, proj, groupStart[1], groupStart[2])
-    insertionSortByMidZ(geom, proj, groupStart[2], groupStart[3])
-    insertionSortByMidZ(geom, proj, groupStart[3], groupStart[4])
+    insertionSortByMidZ(geom, proj, groupStart[0], vEnd0)
+    insertionSortByMidZ(geom, proj, groupStart[1], vEnd1)
+    insertionSortByMidZ(geom, proj, groupStart[2], vEnd2)
+    insertionSortByMidZ(geom, proj, groupStart[3], vEnd3)
   }
 
   const coralAlpha = 0.92
@@ -755,7 +776,7 @@ function drawFrame(
   // 4-batch draw (one path per color group). Glow uses filter blur (no shadowBlur in hot loop).
   for (let group = 0; group < 4; group++) {
     const start = groupStart[group]
-    const end = groupStart[group + 1]
+    const end = group === 0 ? vEnd0 : group === 1 ? vEnd1 : group === 2 ? vEnd2 : vEnd3
 
     ctx.beginPath()
     for (let i = start; i < end; i++) {
@@ -806,7 +827,7 @@ function drawFrame(
     for (let idx = 0; idx < fullCount; idx++) {
       const base = idx * 8
       if ((fish[base + 7] | 0) !== group) continue
-      addFishBodyToPath(ctx, fish, base, t, c, s, cx, cy)
+      addFishBodyToPath(ctx, fish, base, t, c, s, ox, oy, zoom)
     }
     ctx.globalAlpha = fishBaseAlpha
     ctx.fillStyle = HEALTHY_COLORS[group]
@@ -818,14 +839,14 @@ function drawFrame(
     const base = fadeIndex * 8
     const group = fish[base + 7] | 0
     ctx.beginPath()
-    addFishBodyToPath(ctx, fish, base, t, c, s, cx, cy)
+    addFishBodyToPath(ctx, fish, base, t, c, s, ox, oy, zoom)
     ctx.globalAlpha = fishBaseAlpha * fade
     ctx.fillStyle = HEALTHY_COLORS[group]
     ctx.fill()
 
     // Eye for fade fish.
     ctx.beginPath()
-    addFishEyeToPath(ctx, fish, base, t, c, s, cx, cy)
+    addFishEyeToPath(ctx, fish, base, t, c, s, ox, oy, zoom)
     ctx.globalAlpha = fishBaseAlpha * fade
     ctx.fillStyle = 'rgba(0,0,0,0.85)'
     ctx.fill()
@@ -835,7 +856,7 @@ function drawFrame(
   ctx.beginPath()
   for (let idx = 0; idx < fullCount; idx++) {
     const base = idx * 8
-    addFishEyeToPath(ctx, fish, base, t, c, s, cx, cy)
+    addFishEyeToPath(ctx, fish, base, t, c, s, ox, oy, zoom)
   }
   ctx.globalAlpha = fishBaseAlpha
   ctx.fillStyle = 'rgba(0,0,0,0.85)'
@@ -858,32 +879,67 @@ function StatRow({ label, value, warn = false }: { label: string; value: string;
 export default function CoralReefCanvas({
   title      = 'Coral Reef',
   subtitle,
+  variant,
   titleLevel = 2,
+  mode = 'reef-health',
 }: CoralReefCanvasProps) {
-  const [selectedYear, setSelectedYear] = useState(LAST_YEAR)
-  const yearRef     = useRef(LAST_YEAR)
+  const isReefHealth = mode === 'reef-health'
+  const minValue = isReefHealth ? GLOBAL_FIRST_YEAR : STAR_FIRST
+  const maxValue = isReefHealth ? GLOBAL_LAST_YEAR : STAR_LAST
+  const span = maxValue - minValue || 1
+
+  const [selectedValue, setSelectedValue] = useState<number>(maxValue)
+  const valueRef = useRef<number>(maxValue)
   const canvasRef   = useRef<HTMLCanvasElement>(null)
   const sceneRef    = useRef<Scene | null>(null)
   const rafRef      = useRef<number>(0)
   const startRef    = useRef<number>(0)
   const segCountRef = useRef<number>(0)
 
-  useEffect(() => { yearRef.current = selectedYear }, [selectedYear])
+  // View transform refs (no React state updates per-frame / per-pointermove).
+  const zoomRef = useRef(1)
+  const panXRef = useRef(0)
+  const panYRef = useRef(0)
+  const dprRef = useRef(1)
+
+  useEffect(() => {
+    setSelectedValue(maxValue)
+    valueRef.current = maxValue
+  }, [maxValue])
+
+  useEffect(() => { valueRef.current = selectedValue }, [selectedValue])
 
   useEffect(() => {
     const maybeCanvas = canvasRef.current
     if (!maybeCanvas) return
     const canvas: HTMLCanvasElement = maybeCanvas
 
+    canvas.style.cursor = 'grab'
+    canvas.style.touchAction = 'none'
+
+    function clampView() {
+      const scene = sceneRef.current
+      if (!scene) return
+      const z = Math.max(0.75, Math.min(2.5, zoomRef.current))
+      zoomRef.current = z
+
+      const maxPanX = scene.w * 0.40 * z
+      const maxPanY = scene.h * 0.28 * z
+      panXRef.current = Math.max(-maxPanX, Math.min(maxPanX, panXRef.current))
+      panYRef.current = Math.max(-maxPanY, Math.min(maxPanY, panYRef.current))
+    }
+
     function resize() {
       const dpr = window.devicePixelRatio || 1
       const cw  = canvas.parentElement?.clientWidth ?? 900
+      dprRef.current = dpr
       canvas.width        = cw * dpr
       canvas.height       = 560 * dpr
       canvas.style.width  = cw + 'px'
       canvas.style.height = '560px'
       sceneRef.current    = generateScene(canvas.width, canvas.height)
       segCountRef.current = sceneRef.current.geom.length / 8
+      clampView()
     }
 
     function tick(now: number) {
@@ -891,8 +947,74 @@ export default function CoralReefCanvas({
       const ctx = canvas.getContext('2d')
       if (!ctx || !sceneRef.current) return
       const t      = (now - startRef.current) / 1000
-      const health = healthAtYear(yearRef.current)
-      drawFrame(ctx, sceneRef.current, t, health)
+      const health = isReefHealth
+        ? reefHealthIndexAtYear(valueRef.current).health
+        : growthHealthAtAge(valueRef.current)
+      drawFrame(ctx, sceneRef.current, t, health, mode, zoomRef.current, panXRef.current, panYRef.current)
+    }
+
+    function onWheel(e: WheelEvent) {
+      if (!sceneRef.current) return
+      // Zoom in/out (wheel + trackpad). Clamp; adjust pan to zoom around the cursor position.
+      e.preventDefault()
+      const scene = sceneRef.current
+      if (!scene) return
+
+      const rect = canvas.getBoundingClientRect()
+      const dpr = dprRef.current || 1
+      const mx = (e.clientX - rect.left) * dpr
+      const my = (e.clientY - rect.top) * dpr
+
+      const oldZoom = zoomRef.current
+      const zoomFactor = Math.exp(-e.deltaY * 0.0012)
+      const nextZoom = Math.max(0.75, Math.min(2.5, oldZoom * zoomFactor))
+
+      if (Math.abs(nextZoom - oldZoom) < 1e-4) return
+
+      // Keep the point under the cursor stable (approx) in screen space.
+      const cx = scene.w / 2
+      const cy = scene.h * 0.5
+      const dx = mx - cx - panXRef.current
+      const dy = my - cy - panYRef.current
+      const ratio = nextZoom / oldZoom
+      panXRef.current = panXRef.current + dx * (1 - ratio)
+      panYRef.current = panYRef.current + dy * (1 - ratio)
+      zoomRef.current = nextZoom
+      clampView()
+    }
+
+    let dragging = false
+    let dragPointerId = -1
+    let lastClientX = 0
+    let lastClientY = 0
+
+    function onPointerDown(e: PointerEvent) {
+      dragging = true
+      dragPointerId = e.pointerId
+      lastClientX = e.clientX
+      lastClientY = e.clientY
+      canvas.setPointerCapture(dragPointerId)
+      canvas.style.cursor = 'grabbing'
+    }
+
+    function onPointerMove(e: PointerEvent) {
+      if (!dragging || e.pointerId !== dragPointerId) return
+      const dpr = dprRef.current || 1
+      const dx = (e.clientX - lastClientX) * dpr
+      const dy = (e.clientY - lastClientY) * dpr
+      lastClientX = e.clientX
+      lastClientY = e.clientY
+      panXRef.current += dx
+      panYRef.current += dy
+      clampView()
+    }
+
+    function onPointerUp(e: PointerEvent) {
+      if (e.pointerId !== dragPointerId) return
+      dragging = false
+      dragPointerId = -1
+      canvas.releasePointerCapture(e.pointerId)
+      canvas.style.cursor = 'grab'
     }
 
     const ro = new ResizeObserver(resize)
@@ -901,26 +1023,69 @@ export default function CoralReefCanvas({
     startRef.current = performance.now()
     rafRef.current   = requestAnimationFrame(tick)
 
+    canvas.addEventListener('wheel', onWheel, { passive: false })
+    canvas.addEventListener('pointerdown', onPointerDown)
+    canvas.addEventListener('pointermove', onPointerMove)
+    canvas.addEventListener('pointerup', onPointerUp)
+    canvas.addEventListener('pointercancel', onPointerUp)
+
     return () => {
       cancelAnimationFrame(rafRef.current)
       ro.disconnect()
+      canvas.removeEventListener('wheel', onWheel)
+      canvas.removeEventListener('pointerdown', onPointerDown)
+      canvas.removeEventListener('pointermove', onPointerMove)
+      canvas.removeEventListener('pointerup', onPointerUp)
+      canvas.removeEventListener('pointercancel', onPointerUp)
     }
-  }, [])
+  }, [isReefHealth, mode])
 
-  const health      = healthAtYear(selectedYear)
-  const activeEvent = TIMELINE.find(p => p.year === selectedYear)?.event ?? null
-  const isWarn      = health < 50
+  const healthSample = isReefHealth
+    ? reefHealthIndexAtYear(selectedValue)
+    : { health: growthHealthAtAge(selectedValue) }
+  const health = healthSample.health
+
+  const activeEvent = isReefHealth
+    ? (GLOBAL_EVENT_YEARS.find((p) => p.year === selectedValue)?.label ?? null)
+    : (
+      // Reef Star Growth staging notes:
+      // - Inspired by results showing rapid reef growth / functional (carbonate budget) recovery within ~4 years in a
+      //   large-scale Indonesia restoration program: Lange ID et al. (2024) Current Biology.
+      //   DOI: 10.1016/j.cub.2024.02.009
+      selectedValue === 0 ? 'INSTALL · RUBBLE FIELD'
+        : selectedValue === 1 ? 'STABILIZATION'
+          : selectedValue === 2 ? 'EARLY REGROWTH'
+            : selectedValue === 3 ? 'STRUCTURE BUILDS'
+              : selectedValue === 4 ? 'FUNCTIONAL RECOVERY'
+                : null
+    )
+  const isWarn = isReefHealth ? health < 72 : health < 35
 
   const displayTitle    = title.toUpperCase()
-  const displaySubtitle = (subtitle ?? 'BLEACHING INDEX · INDONESIA REEF SYSTEM').toUpperCase()
+  const displaySubtitle = (subtitle ?? (isReefHealth ? 'GLOBAL REEF HEALTH · GCRMN · NOAA CRW' : 'MARRS REEF STARS · INDONESIA')).toUpperCase()
 
   const safeLevel = Math.max(1, Math.min(6, titleLevel)) as 1 | 2 | 3 | 4 | 5 | 6
   const TitleTag  = `h${safeLevel}` as `h${typeof safeLevel}`
+  const heroClass = `coral-reef-hero${variant === 'card' ? ' coral-reef-hero--card' : ''}`
 
   return (
-    <section className="coral-reef-hero" aria-label="Coral reef health specimen viewer">
+    <section className={heroClass} aria-label={isReefHealth ? 'Reef health viewer' : 'Reef Star Growth viewer'}>
 
       <canvas ref={canvasRef} className="coral-reef-canvas" aria-hidden />
+
+      <div className="crc-view-controls" aria-hidden>
+        <button
+          type="button"
+          className="crc-view-reset"
+          onClick={() => {
+            zoomRef.current = 1
+            panXRef.current = 0
+            panYRef.current = 0
+          }}
+        >
+          Reset view
+        </button>
+      </div>
 
       {/* ── Header — top-left ──────────────────────────────────── */}
       <div className="crc-header">
@@ -930,20 +1095,23 @@ export default function CoralReefCanvas({
 
       {/* ── Stats — top-right ──────────────────────────────────── */}
       <aside className="crc-stats" aria-label="Reef statistics" aria-live="polite">
-        <StatRow label="YEAR"     value={String(selectedYear)} />
-        <StatRow label="HEALTH"   value={`${Math.round(health)}%`}      warn={isWarn} />
+        <StatRow label={isReefHealth ? 'YEAR' : 'AGE'} value={String(selectedValue)} />
+        <StatRow label={isReefHealth ? 'HEALTH' : 'GROWTH'} value={`${Math.round(health)}%`} warn={isWarn} />
+        {isReefHealth && selectedValue > LAST_GCRMN_COVER_YEAR && healthSample.noaaAsOfDate && (
+          <StatRow label="NOAA" value={healthSample.noaaAsOfDate} />
+        )}
         <StatRow label="COLONIES" value={String(COLONY_LAYOUT.length)} />
         <StatRow label="SEGMENTS" value={String(segCountRef.current)} />
-        {activeEvent && <StatRow label="STATUS" value="BLEACHING" warn />}
+        {activeEvent && <StatRow label="STATUS" value={isReefHealth ? 'BLEACHING' : 'GROWTH'} warn={isWarn} />}
       </aside>
 
       {/* ── Scrubber — bottom ──────────────────────────────────── */}
       <div className="crc-controls">
         <div className="crc-year-display">
-          <span className="crc-year-num">{selectedYear}</span>
+          <span className="crc-year-num">{selectedValue}</span>
           {activeEvent
             ? <span className="crc-event-text">{activeEvent.toUpperCase()}</span>
-            : <span className="crc-hint-text">DRAG TO EXPLORE HISTORY</span>
+            : <span className="crc-hint-text">{isReefHealth ? 'DRAG TO EXPLORE HISTORY' : 'DRAG TO SEE GROWTH'}</span>
           }
         </div>
 
@@ -951,33 +1119,43 @@ export default function CoralReefCanvas({
           <input
             type="range"
             className="crc-slider"
-            min={FIRST_YEAR}
-            max={LAST_YEAR}
+            min={minValue}
+            max={maxValue}
             step={1}
-            value={selectedYear}
-            onChange={e => setSelectedYear(Number(e.target.value))}
-            aria-label="Select year to view coral health"
+            value={selectedValue}
+            onChange={e => setSelectedValue(Number(e.target.value))}
+            aria-label={isReefHealth ? 'Select year to view reef health' : 'Select years since installation'}
           />
           <div className="crc-ticks" aria-hidden>
-            {EVENT_YEARS.map(p => (
-              <span
-                key={p.year}
-                className={`crc-tick${p.year === selectedYear ? ' crc-tick--active' : ''}`}
-                style={{ left: `${((p.year - FIRST_YEAR) / YEAR_SPAN) * 100}%` }}
-              />
-            ))}
+            {isReefHealth
+              ? GLOBAL_EVENT_YEARS.map(p => (
+                <span
+                  key={p.year}
+                  className={`crc-tick${p.year === selectedValue ? ' crc-tick--active' : ''}`}
+                  style={{ left: `${((p.year - minValue) / span) * 100}%` }}
+                />
+              ))
+              : STAR_TICKS.map((p) => (
+                <span
+                  key={p}
+                  className={`crc-tick${p === selectedValue ? ' crc-tick--active' : ''}`}
+                  style={{ left: `${((p - minValue) / span) * 100}%` }}
+                />
+              ))}
           </div>
         </div>
 
         <div className="crc-range-ends">
-          <span>{FIRST_YEAR}</span>
-          <span>{LAST_YEAR}</span>
+          <span>{minValue}</span>
+          <span>{isReefHealth ? `TODAY (${maxValue})` : maxValue}</span>
         </div>
       </div>
 
       <span className="coral-reef-hero__sr-text">
-        3D coral reef health visualization. Use the year slider to explore bleaching events
-        from {FIRST_YEAR} to {LAST_YEAR}.
+        {isReefHealth
+          ? `3D reef visualization. Use the year slider to explore changes from ${minValue} to ${maxValue}.`
+          : '3D reef restoration visualization. Use the scrubber to explore growth from year 0 to year 4.'
+        }
       </span>
     </section>
   )

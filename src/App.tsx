@@ -8,6 +8,7 @@ import LoginPage from './pages/LoginPage'
 const HomePage = lazy(() => import('./pages/HomePage'))
 const DonationPage = lazy(() => import('./pages/DonationPage'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
+const ReefHealth = lazy(() => import('./pages/ReefHealth'))
 const StakeholderNetworkPage = lazy(() => import('./pages/StakeholderNetworkPage'))
 const HypothesisTracker = lazy(() => import('./pages/HypothesisTracker'))
 const InterviewProtocol = lazy(() => import('./pages/InterviewProtocol'))
@@ -29,6 +30,7 @@ export default function App() {
           <Layout>
             <Routes>
               <Route path="/" element={<Suspense fallback={<PageLoading />}><HomePage /></Suspense>} />
+              <Route path="/reef-health" element={<Suspense fallback={<PageLoading />}><ReefHealth /></Suspense>} />
               <Route path="/donate" element={<Suspense fallback={<PageLoading />}><DonationPage /></Suspense>} />
               <Route path="/research" element={<Suspense fallback={<PageLoading />}><Dashboard /></Suspense>} />
               <Route path="/dashboard" element={<Navigate to="/research" replace />} />

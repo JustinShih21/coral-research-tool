@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import CoralReefCanvas from '@/components/CoralReefCanvas'
 
 const HERO_IMAGE = 'https://images.unsplash.com/photo-1572713629470-3e9f5d4fdf4c?auto=format&fit=crop&w=1800&q=80'
 
@@ -86,7 +85,7 @@ export default function HomePage() {
           </p>
           <div className="home-hero-actions">
             <Link to="/donate" className="button-primary">Fund Restoration</Link>
-            <Link to="/research" className="button-secondary">Explore Research Plan</Link>
+            <Link to="/reef-health" className="button-secondary">Explore Reef Health</Link>
           </div>
           <div className="home-hero-metrics" role="list" aria-label="Impact snapshot">
             <article role="listitem">
@@ -107,13 +106,6 @@ export default function HomePage() {
           <img src={HERO_IMAGE} alt="Coral reef restoration diver" loading="eager" />
         </figure>
       </section>
-
-      <CoralReefCanvas
-        title="Reef health timeline"
-        subtitle="Drag the slider to explore coral health from 2000 to today."
-        variant="card"
-        titleLevel={2}
-      />
 
       <section className="home-outlook">
         <div className="home-section-head">
