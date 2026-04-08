@@ -1,4 +1,4 @@
-import type { LibraryDocument, LibraryReading, LibraryRecording } from '@/types/library'
+import type { LibraryDocument, LibraryReading } from '@/types/library'
 
 export const libraryDocuments: LibraryDocument[] = [
   {
@@ -149,31 +149,4 @@ export const libraryReadings: LibraryReading[] = [
   { id: 'huang-2025-nitrogen', title: 'Nitrogen source type and heat stress in coral symbiont (2025)', topic: 'Nitrogen / biology', source: 'Secondary Research / Articles', link: '/Coral Farming/Secondary Research/Articles /huang-et-al-2025-nitrogen-source-type-modulates-heat-stress-response-in-coral-symbiont-(cladocopium-goreaui).pdf' },
   { id: 'resilience-rodrigues', title: 'From risk to resilience: coastal flooding Rodrigues Island', topic: 'Adaptation', source: 'Secondary Research / Articles', link: '/Coral Farming/Secondary Research/Articles /From risk to resilience- geospatial decision support tool and adaptation strategies for coastal flooding in Rodrigues Island.pdf' },
   { id: 'landscape-saint-martin', title: 'Landscape transition and ecological risk (Saint Martin Island, Bangladesh)', topic: 'Monitoring / risk', source: 'Secondary Research / Articles', link: '/Coral Farming/Secondary Research/Articles /Landscape transition‑induced ecological risk modeling using GIS and remote sensing techniques- a case of Saint Martin Island, Bangladesh.pdf' },
-]
-
-export const libraryRecordings: LibraryRecording[] = [
-  {
-    id: 'living-seas-leon-boey',
-    title: 'Living Seas — Leon Boey',
-    description: 'Interview recording with Leon Boey (Living Seas), Feb 2026.',
-    type: 'video',
-    source: 'New 2026',
-    link: '/Coral Farming/New 2026/LivingSeasLeonBoeyFeb3.mp4',
-  },
-  {
-    id: 'coral-catch-recording',
-    title: 'Coral Catch recording',
-    description: 'Field recording from Coral Catch engagement.',
-    type: 'video',
-    source: 'Trip Notes / Interviews',
-    link: '/Coral Farming/Trip Notes/Interviews/coralCatchRecording.mp4',
-  },
-  {
-    id: 'indonesia-biru-foundation',
-    title: 'Indonesia Biru Foundation',
-    description: 'Interview recording with Indonesia Biru Foundation.',
-    type: 'audio',
-    source: 'Trip Notes / Interviews',
-    link: '/Coral Farming/Trip Notes/Interviews/indonesia biru foundation.m4a',
-  },
 ]

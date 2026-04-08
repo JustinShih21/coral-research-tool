@@ -11,8 +11,7 @@ import {
 } from '@/data/researchFramework'
 import { useAuth } from '@/contexts/AuthContext'
 import { getResearchData, setResearchData, RESEARCH_KEYS } from '@/lib/researchStorage'
-import Hero from '@/components/Hero'
-import { HERO_IMAGE } from '@/data/imageAssets'
+import CoralReefCanvas from '@/components/CoralReefCanvas'
 
 const CURRENT_PHASE_ID = 1
 
@@ -108,11 +107,11 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard">
-      <Hero
-        imageUrl={HERO_IMAGE}
-        imageAlt="Coral reef and ocean"
+      <CoralReefCanvas
         title="Research Program Dashboard"
-        subtitle="Indonesia Coral Reef Financing Research — mission, core framework, and execution phases."
+        subtitle="Indonesia Coral Reef Financing Research"
+        variant="full"
+        titleLevel={1}
       />
       <section className="dashboard-panel">
         <h2>Project Mission</h2>

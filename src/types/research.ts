@@ -25,11 +25,33 @@ export interface CaseStudyImage {
   credit?: string
 }
 
+export interface CaseStudySignal {
+  id: string
+  label: string
+  value: number
+  unit?: string
+  note?: string
+}
+
+export interface CaseStudyScores {
+  institutionalEmbedding: number
+  damageVisibility: number
+  financeMaturity: number
+  reefTransferPotential: number
+}
+
 export interface CaseStudy {
   id: string
   title: string
   summary: string
   relevance: string
+  fundingTrigger: string
+  primaryPayer: string
+  paybackHorizon: string
+  scores: CaseStudyScores
+  quantSignals: CaseStudySignal[]
+  mechanismPoints: string[]
+  accent: string
   image?: CaseStudyImage
 }
 

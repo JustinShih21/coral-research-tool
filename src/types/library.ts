@@ -23,13 +23,3 @@ export interface Contact {
   description: string
   category: 'in_person' | 'virtual'
 }
-
-export interface LibraryRecording {
-  id: string
-  title: string
-  description: string
-  type: 'video' | 'audio'
-  source: string
-  /** When set, show embedded player */
-  link?: string
-}

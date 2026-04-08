@@ -1,13 +1,13 @@
 import type { ActorCategory, FundingRole, InterviewStatus, RelationshipType } from '@/types/graph'
 
 export const CATEGORY_COLORS: Record<ActorCategory, string> = {
-  restoration_operator: '#007B6E',
-  tourism_dive: '#2E6B8A',
-  government: '#0A1E3A',
-  investor_funder: '#C8922A',
-  fisheries: '#2D7A4A',
-  degradation_driver: '#C2410C',
-  insurance_finance: '#5B3A8A',
+  restoration_operator: '#FF6B5E',  // warm coral
+  tourism_dive: '#2BBFB0',          // tropical teal
+  government: '#3470C8',            // deep ocean blue
+  investor_funder: '#F5A828',       // warm gold / sunlight
+  fisheries: '#3AAA70',             // sea grass green
+  degradation_driver: '#FF4444',    // hot warning red
+  insurance_finance: '#9060D8',     // sea anemone purple
 }
 
 export const CATEGORY_ICONS: Record<ActorCategory, string> = {

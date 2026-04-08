@@ -25,6 +25,8 @@ Output is in `dist/`.
 
 ## Features
 
+- **Home** — Public-facing nonprofit landing page (new)
+- **Donate** — Donation landing page with impact calculator (new)
 - **Dashboard** — Research phases and key activities
 - **Stakeholder Network** — Interactive D3 force-directed graph: filter by category, relationship type, interview status; path highlight between two nodes; click a node for detail panel and interview notes; export graph as JSON
 - **Hypothesis Tracker** — H1–H4 with add/remove evidence (synced to Supabase)
@@ -43,3 +45,7 @@ Output is in `dist/`.
 ## Vercel deployment
 
 Set environment variables in the Vercel project: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Ensure the `research_data` table exists in Supabase (run `supabase-schema.sql`).
+
+Optional donation configuration:
+- `VITE_DONATION_URL` — external donation processor URL (Stripe payment link, Givebutter, Donorbox, etc.); the app appends `amount` and `frequency` query params.
+- `VITE_DONATION_EMAIL` — fallback email address for pledge flow when `VITE_DONATION_URL` is not set.

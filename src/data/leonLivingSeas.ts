@@ -273,8 +273,4 @@ export const leonSourceFiles = [
     label: 'Interview Questions (Trip Notes)',
     link: '/Coral Farming/Trip Notes/Interviews/interview questions.docx',
   },
-  {
-    label: 'Living Seas Recording (Feb 2026)',
-    link: '/Coral Farming/New 2026/LivingSeasLeonBoeyFeb3.mp4',
-  },
 ]

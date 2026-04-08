@@ -1,99 +1,103 @@
-import { useState, useEffect, useRef, Fragment } from 'react'
-import { Outlet, NavLink, Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Outlet, NavLink, Link, useLocation } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
-import { SIDEBAR_IMAGE } from '@/data/imageAssets'
 
 export default function Layout({ children }: { children?: React.ReactNode }) {
-  const mainRef = useRef<HTMLElement>(null)
-  const [showBackToTop, setShowBackToTop] = useState(false)
+  const location = useLocation()
+  const [menuOpen, setMenuOpen] = useState(false)
   const { user, loading, signOut } = useAuth()
 
   useEffect(() => {
-    const el = mainRef.current
-    if (!el) return
-    const onScroll = () => setShowBackToTop(el.scrollTop > 400)
-    el.addEventListener('scroll', onScroll, { passive: true })
-    return () => el.removeEventListener('scroll', onScroll)
-  }, [])
-
-  const scrollToTop = () => {
-    mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
-  }
+    setMenuOpen(false)
+  }, [location.pathname])
 
   const publicNav = [
-    { to: '/', label: 'Dashboard' },
+    { to: '/', label: 'Home' },
+    { to: '/donate', label: 'Donate' },
+    { to: '/research', label: 'Research Plan' },
     { to: '/cases', label: 'Case Studies' },
     { to: '/library', label: 'Research Library' },
-    { to: '/contacts', label: 'Contacts' },
     { to: '/network', label: 'Stakeholder Network' },
+    { to: '/contacts', label: 'Contacts' },
   ]
 
   const fullNav = [
-    { to: '/', label: 'Dashboard' },
+    { to: '/', label: 'Home' },
+    { to: '/donate', label: 'Donate' },
+    { to: '/research', label: 'Research Plan' },
     { to: '/cases', label: 'Case Studies' },
     { to: '/library', label: 'Research Library' },
-    { to: '/contacts', label: 'Contacts' },
     { to: '/network', label: 'Stakeholder Network' },
+    { to: '/contacts', label: 'Contacts' },
     { to: '/hypotheses', label: 'Hypothesis Tracker' },
     { to: '/interview', label: 'Interview Protocol' },
     { to: '/leon-living-seas', label: 'Leon + Living Seas' },
   ]
 
   const navItems = user ? fullNav : publicNav
-  const teamOnlyStartIndex = publicNav.length
 
   return (
-    <div className="layout">
-      <aside className="sidebar">
-        <h1 className="sidebar-title">Coral Research</h1>
-        <nav className="nav">
-          {navItems.map(({ to, label }, i) => (
-            <Fragment key={to}>
-              {user && i === teamOnlyStartIndex && (
-                <span className="nav-team-label">Team tools</span>
+    <div className="site-shell">
+      <header className="site-header">
+        <div className="site-header-inner">
+          <Link to="/" className="site-brand">
+            <span className="site-brand-mark" aria-hidden />
+            <span className="site-brand-text">
+              <strong>Coral Research Initiative</strong>
+              <span>Restoration Finance & Field Action</span>
+            </span>
+          </Link>
+          <button
+            type="button"
+            className="site-menu-toggle"
+            onClick={() => setMenuOpen((open) => !open)}
+            aria-expanded={menuOpen}
+            aria-controls="site-nav-panel"
+          >
+            Menu
+          </button>
+          <div id="site-nav-panel" className={`site-nav-panel${menuOpen ? ' open' : ''}`}>
+            <nav className="site-nav" aria-label="Main">
+              {navItems.map(({ to, label }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  className={({ isActive }) => {
+                    const active = isActive ? ' active' : ''
+                    const donate = to === '/donate' ? ' donate' : ''
+                    return `site-nav-link${active}${donate}`
+                  }}
+                >
+                  {label}
+                </NavLink>
+              ))}
+            </nav>
+            <div className="site-auth">
+              {!loading && (
+                user ? (
+                  <>
+                    <span className="site-auth-user">{user.user_metadata?.full_name || user.email}</span>
+                    <button type="button" className="site-auth-button" onClick={() => signOut()}>
+                      Log out
+                    </button>
+                  </>
+                ) : (
+                  <Link to="/login" className="site-auth-link">Team log in</Link>
+                )
               )}
-              <NavLink to={to} className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-                {label}
-              </NavLink>
-            </Fragment>
-          ))}
-        </nav>
-        <div
-          className="sidebar-brand"
-          style={{ backgroundImage: `url(${SIDEBAR_IMAGE})` }}
-          aria-hidden
-        />
-      </aside>
-      <main ref={mainRef} className="main">
-        <div className="main-header">
-          <span />
-          <div className="auth-bar">
-            {!loading && (
-              user ? (
-                <>
-                  <span className="auth-user">{user.user_metadata?.full_name || user.email}</span>
-                  <button type="button" className="auth-logout" onClick={() => signOut()}>
-                    Log out
-                  </button>
-                </>
-              ) : (
-                <Link to="/login" className="auth-login">Log in</Link>
-              )
-            )}
+            </div>
           </div>
         </div>
+      </header>
+      <main className="main site-main">
         {children ?? <Outlet />}
       </main>
-      {showBackToTop && (
-        <button
-          type="button"
-          className="back-to-top"
-          onClick={scrollToTop}
-          aria-label="Back to top"
-        >
-          ↑
-        </button>
-      )}
+      <footer className="site-footer">
+        <div className="site-footer-inner">
+          <p>Coral Research Initiative · Building bankable pathways for reef restoration.</p>
+          <Link to="/donate" className="site-footer-donate">Support Restoration</Link>
+        </div>
+      </footer>
     </div>
   )
 }

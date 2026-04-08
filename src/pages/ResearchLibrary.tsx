@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { libraryDocuments, libraryReadings, libraryRecordings } from '@/data/researchLibrary'
+import { libraryDocuments, libraryReadings } from '@/data/researchLibrary'
 import { useAuth } from '@/contexts/AuthContext'
 import { getResearchData, setResearchData } from '@/lib/researchStorage'
 import type { LibraryDocument } from '@/types/library'
@@ -8,7 +8,16 @@ import { LIBRARY_IMAGE } from '@/data/imageAssets'
 const LIBRARY_EXTRA_KEY = 'library-documents-extra'
 const LIBRARY_IMAGE_CANDIDATES = ['/images/library/library.jpg', LIBRARY_IMAGE, '/reef.svg'] as const
 
-type Tab = 'documents' | 'readings' | 'recordings'
+type Tab = 'documents' | 'readings'
+type PreviewMode = 'iframe' | 'office' | 'unsupported'
+
+interface PreviewState {
+  title: string
+  link: string
+  mode: PreviewMode
+  src?: string
+  reason?: string
+}
 
 function parseExtraDocs(value: unknown): LibraryDocument[] {
   if (!Array.isArray(value)) return []
@@ -23,12 +32,65 @@ function parseExtraDocs(value: unknown): LibraryDocument[] {
   )
 }
 
+function normalizeLink(link: string): string {
+  return encodeURI(link)
+}
+
+function extensionFromLink(link: string): string {
+  const normalized = link.split('?')[0].split('#')[0]
+  const idx = normalized.lastIndexOf('.')
+  if (idx < 0) return ''
+  return normalized.slice(idx + 1).toLowerCase()
+}
+
+function isLocalDevHost(): boolean {
+  if (typeof window === 'undefined') return false
+  return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+}
+
+function absoluteUrl(link: string): string {
+  if (/^https?:\/\//i.test(link)) return link
+  if (typeof window === 'undefined') return link
+  if (link.startsWith('/')) return `${window.location.origin}${link}`
+  return `${window.location.origin}/${link}`
+}
+
+function buildPreview(title: string, rawLink: string): PreviewState {
+  const link = normalizeLink(rawLink)
+  const ext = extensionFromLink(link)
+
+  if (['pdf', 'txt', 'md', 'csv', 'json', 'html', 'htm', 'svg', 'png', 'jpg', 'jpeg', 'webp'].includes(ext)) {
+    return { title, link, mode: 'iframe', src: link }
+  }
+
+  if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) {
+    if (isLocalDevHost()) {
+      return {
+        title,
+        link,
+        mode: 'unsupported',
+        reason: 'Office document preview works best on deployed URLs. In local dev, use download/open.',
+      }
+    }
+    const officeSrc = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(absoluteUrl(link))}`
+    return { title, link, mode: 'office', src: officeSrc }
+  }
+
+  return {
+    title,
+    link,
+    mode: 'unsupported',
+    reason: 'Preview is not available for this file type. Use download/open instead.',
+  }
+}
+
 export default function ResearchLibrary() {
   const { user } = useAuth()
   const [tab, setTab] = useState<Tab>('documents')
   const [topicFilter, setTopicFilter] = useState<string>('')
   const [search, setSearch] = useState('')
   const [libraryImageIndex, setLibraryImageIndex] = useState(0)
+  const [preview, setPreview] = useState<PreviewState | null>(null)
 
   const [extraDocuments, setExtraDocuments] = useState<LibraryDocument[]>([])
   useEffect(() => {
@@ -48,32 +110,27 @@ export default function ResearchLibrary() {
   const searchLower = search.trim().toLowerCase()
   const filteredDocs = useMemo(() => {
     let list = topicFilter === '' ? allDocuments : allDocuments.filter((d) => d.topic === topicFilter)
-    if (searchLower)
+    if (searchLower) {
       list = list.filter(
         (d) =>
           d.title.toLowerCase().includes(searchLower) ||
           (d.description && d.description.toLowerCase().includes(searchLower)) ||
           (d.topic && d.topic.toLowerCase().includes(searchLower))
       )
+    }
     return list
   }, [topicFilter, searchLower, allDocuments])
+
   const filteredReadings = useMemo(() => {
     let list = topicFilter === '' ? libraryReadings : libraryReadings.filter((r) => r.topic === topicFilter)
-    if (searchLower)
+    if (searchLower) {
       list = list.filter(
         (r) =>
           r.title.toLowerCase().includes(searchLower) || r.topic.toLowerCase().includes(searchLower)
       )
+    }
     return list
   }, [topicFilter, searchLower])
-  const filteredRecordings = useMemo(() => {
-    if (!searchLower) return libraryRecordings
-    return libraryRecordings.filter(
-      (r) =>
-        r.title.toLowerCase().includes(searchLower) ||
-        r.description.toLowerCase().includes(searchLower)
-    )
-  }, [searchLower])
 
   const saveExtraDocuments = (next: LibraryDocument[]) => {
     setExtraDocuments(next)
@@ -96,6 +153,11 @@ export default function ResearchLibrary() {
       prev < LIBRARY_IMAGE_CANDIDATES.length - 1 ? prev + 1 : prev
     )
 
+  const previewItem = (title: string, link?: string) => {
+    if (!link) return
+    setPreview(buildPreview(title, link))
+  }
+
   return (
     <div className="research-library">
       <header className="library-header">
@@ -112,12 +174,12 @@ export default function ResearchLibrary() {
         <div className="library-header-content">
           <h1>Research Library</h1>
           <p className="library-header-intro">
-            Documents, readings, and recordings from the Coral Farming archive.
+            Document-first archive from the Coral Farming research set.
           </p>
         </div>
       </header>
       <p className="library-intro">
-        Add links when files are hosted to enable direct access or playback.
+        Preview documents directly in the site, then download or open in a new tab.
       </p>
       <div className="library-tabs">
         <button
@@ -134,41 +196,32 @@ export default function ResearchLibrary() {
         >
           Readings
         </button>
-        <button
-          type="button"
-          className={tab === 'recordings' ? 'active' : ''}
-          onClick={() => setTab('recordings')}
-        >
-          Recordings
-        </button>
       </div>
       <div className="library-filters">
         <label className="library-search-label">
           Search:
           <input
             type="search"
-            placeholder={tab === 'recordings' ? 'Search recordings…' : 'Title, topic, description…'}
+            placeholder="Title, topic, description..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="library-search-input"
           />
         </label>
-        {tab !== 'recordings' && (
-          <label>
-            Topic:
-            <select
-              value={topicFilter}
-              onChange={(e) => setTopicFilter(e.target.value)}
-            >
-              <option value="">All</option>
-              {(tab === 'documents' ? topicsDocs : topicsReadings).map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
+        <label>
+          Topic:
+          <select
+            value={topicFilter}
+            onChange={(e) => setTopicFilter(e.target.value)}
+          >
+            <option value="">All</option>
+            {(tab === 'documents' ? topicsDocs : topicsReadings).map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
       {tab === 'documents' && (
         <>
@@ -179,24 +232,10 @@ export default function ResearchLibrary() {
             />
           )}
           <ul className="library-list documents-list">
-            {filteredDocs.map((doc) => (
-              <li key={doc.id} className={isExtraDoc(doc.id) ? 'library-card-wrap library-card-extra' : ''}>
-                {doc.link ? (
-                  <a
-                    href={encodeURI(doc.link)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="library-card library-card-link"
-                  >
-                    <h3>{doc.title}</h3>
-                    <p className="library-description">{doc.description}</p>
-                    <div className="library-meta">
-                      <span className="library-source">{doc.source}</span>
-                      {doc.topic && <span className="library-topic">{doc.topic}</span>}
-                    </div>
-                    <span className="library-link">Open document →</span>
-                  </a>
-                ) : (
+            {filteredDocs.map((doc) => {
+              const safeLink = doc.link ? normalizeLink(doc.link) : undefined
+              return (
+                <li key={doc.id} className={isExtraDoc(doc.id) ? 'library-card-wrap library-card-extra' : ''}>
                   <div className="library-card library-card-no-link">
                     <h3>{doc.title}</h3>
                     <p className="library-description">{doc.description}</p>
@@ -204,92 +243,109 @@ export default function ResearchLibrary() {
                       <span className="library-source">{doc.source}</span>
                       {doc.topic && <span className="library-topic">{doc.topic}</span>}
                     </div>
-                    <p className="library-no-link">
-                      No link yet — add a <code>link</code> in the data to open this document.
-                    </p>
+                    {safeLink ? (
+                      <div className="library-card-actions">
+                        <button type="button" className="library-action-btn" onClick={() => previewItem(doc.title, doc.link)}>
+                          Preview
+                        </button>
+                        <a href={safeLink} className="library-action-btn" download>
+                          Download
+                        </a>
+                        <a href={safeLink} target="_blank" rel="noopener noreferrer" className="library-action-btn library-action-ghost">
+                          Open
+                        </a>
+                      </div>
+                    ) : (
+                      <p className="library-no-link">
+                        No link yet - add a <code>link</code> in the data to open this document.
+                      </p>
+                    )}
                   </div>
-                )}
-                {user && isExtraDoc(doc.id) && (
-                  <button
-                    type="button"
-                    className="library-card-delete"
-                    onClick={() => removeExtraDocument(doc.id)}
-                    title="Remove document"
-                  >
-                    Remove
-                  </button>
-                )}
-              </li>
-            ))}
+                  {user && isExtraDoc(doc.id) && (
+                    <button
+                      type="button"
+                      className="library-card-delete"
+                      onClick={() => removeExtraDocument(doc.id)}
+                      title="Remove document"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </li>
+              )
+            })}
           </ul>
         </>
       )}
       {tab === 'readings' && (
         <ul className="library-list readings-list">
-          {filteredReadings.map((r) =>
-            r.link ? (
-              <li key={r.id}>
-                <a
-                  href={encodeURI(r.link)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="library-card library-card-link"
-                >
+          {filteredReadings.map((r) => {
+            const safeLink = r.link ? normalizeLink(r.link) : undefined
+            return (
+              <li key={r.id} className="library-card-wrap">
+                <div className="library-card library-card-no-link">
                   <h3>{r.title}</h3>
                   <div className="library-meta">
                     <span className="library-topic">{r.topic}</span>
                     <span className="library-source">{r.source}</span>
                   </div>
-                  <span className="library-link">Open reading →</span>
-                </a>
-              </li>
-            ) : (
-              <li key={r.id} className="library-card library-card-no-link">
-                <h3>{r.title}</h3>
-                <div className="library-meta">
-                  <span className="library-topic">{r.topic}</span>
-                  <span className="library-source">{r.source}</span>
+                  {safeLink ? (
+                    <div className="library-card-actions">
+                      <button type="button" className="library-action-btn" onClick={() => previewItem(r.title, r.link)}>
+                        Preview
+                      </button>
+                      <a href={safeLink} className="library-action-btn" download>
+                        Download
+                      </a>
+                      <a href={safeLink} target="_blank" rel="noopener noreferrer" className="library-action-btn library-action-ghost">
+                        Open
+                      </a>
+                    </div>
+                  ) : (
+                    <p className="library-no-link">
+                      No link yet - add a <code>link</code> in the data to open this reading.
+                    </p>
+                  )}
                 </div>
-                <p className="library-no-link">
-                  No link yet — add a <code>link</code> in the data to open this reading.
-                </p>
-              </li>
-            )
-          )}
-        </ul>
-      )}
-      {tab === 'recordings' && (
-        <ul className="library-list recordings-list">
-          {filteredRecordings.map((rec) => {
-            const safeLink = rec.link ? encodeURI(rec.link) : undefined
-            return (
-              <li key={rec.id} className="library-card recording-card">
-                <h3>{rec.title}</h3>
-                <p className="library-description">{rec.description}</p>
-                <div className="library-meta">
-                  <span className="library-source">{rec.source}</span>
-                  <span className="recording-type">{rec.type}</span>
-                </div>
-                {safeLink ? (
-                  <div className="recording-embed">
-                    {rec.type === 'video' ? (
-                      <video controls src={safeLink} className="recording-player" />
-                    ) : (
-                      <audio controls src={safeLink} className="recording-player" />
-                    )}
-                  </div>
-                ) : (
-                  <p className="recording-placeholder">Add a link in the data to enable playback.</p>
-                )}
-                {safeLink && (
-                  <a href={safeLink} target="_blank" rel="noopener noreferrer" className="library-link">
-                    Open in new tab
-                  </a>
-                )}
               </li>
             )
           })}
         </ul>
+      )}
+
+      {preview && (
+        <div className="library-preview-backdrop" onClick={() => setPreview(null)}>
+          <section className="library-preview-modal" onClick={(e) => e.stopPropagation()}>
+            <header className="library-preview-header">
+              <div>
+                <h3>{preview.title}</h3>
+                <p>In-site document preview</p>
+              </div>
+              <div className="library-preview-actions">
+                <a href={preview.link} className="library-action-btn" download>
+                  Download
+                </a>
+                <a href={preview.link} target="_blank" rel="noopener noreferrer" className="library-action-btn library-action-ghost">
+                  Open
+                </a>
+                <button type="button" className="library-action-btn library-action-ghost" onClick={() => setPreview(null)}>
+                  Close
+                </button>
+              </div>
+            </header>
+            <div className="library-preview-body">
+              {preview.mode === 'unsupported' || !preview.src ? (
+                <p className="library-preview-fallback">{preview.reason}</p>
+              ) : (
+                <iframe
+                  src={preview.src}
+                  title={`Preview: ${preview.title}`}
+                  className="library-preview-frame"
+                />
+              )}
+            </div>
+          </section>
+        </div>
       )}
     </div>
   )
@@ -348,7 +404,7 @@ function AddDocumentForm({
       </label>
       <label>
         Link (URL or path)
-        <input value={link} onChange={(e) => setLink(e.target.value)} type="url" placeholder="Optional" />
+        <input value={link} onChange={(e) => setLink(e.target.value)} type="text" placeholder="Optional" />
       </label>
       <button type="submit">Add document</button>
     </form>
