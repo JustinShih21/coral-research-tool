@@ -87,7 +87,8 @@ const TAU         = Math.PI * 2
 const BOMMIE_R    = 115   // hemisphere radius (world units)
 const BRANCH_LEN  = 64    // initial trunk length per colony (world units)
 const FOV         = 600   // perspective focal length
-const ROT_PERIOD  = 32    // seconds per full Y revolution
+const STATIC_ROT_Y_HEALTH = 0.04
+const STATIC_ROT_Y_STAR = 0.48
 
 const HEALTHY_COLORS = ['#ff6b9e', '#ff8c42', '#00c9a7', '#c77dff'] as const
 const BLEACH_COLOR   = '#ddd8cc'
@@ -387,39 +388,47 @@ function generateLinesGeom(segments: number[]): LineGeom {
 }
 
 function generateReefStarFrame(rng: () => number): { frame: LineGeom; ties: LineGeom; fragments: LineGeom; anchors: Vec3[] } {
-  // 3D "Reef Star" wireframe:
-  // - Approximate a sand-coated steel structure with depth (top + bottom rings + struts + legs).
-  // - Coral fragments are represented as small strapped stubs at anchor points.
+  // MARRS-inspired Reef Star module:
+  // - Flat six-arm star lattice (not a dome) with slight vertical thickness.
+  // - Steel bars + tie lines + attached coral fragments at anchor points.
   //
-  // References (for shape/storytelling; exact dimensions are not required here):
-  // - Mars / MARRS restoration stories describe "Reef Stars" as modular steel structures placed over rubble,
-  //   coated (often with sand), and used as attachment points for live coral fragments.
+  // References (shape cues):
+  // - Mars restoration program overview and Reef Star framing:
   //   https://www.mars.com/news-and-stories/articles/coral-reef-ecosystem-restoration
-  // - BuildingCoral photos show the characteristic low geodesic dome / cage silhouette during sand coating.
-  //   Example: https://building-coral.transforms.svdcdn.com/production/assets/images/RVT_5910.jpeg
-  const BASE_R = 182
-  const MID_R = 132
-  const TOP_R = 74
-  const BASE_Y = -40
-  const MID_Y = -18
-  const TOP_Y = 4
-  const HUB_Y = 22
-  const LEG_Y = -72
+  // - BuildingCoral deployment/coating imagery showing low-profile modular stars:
+  //   https://building-coral.transforms.svdcdn.com/production/assets/images/RVT_5910.jpeg
+  const OUTER_R = 206
+  const INNER_R = 122
+  const CORE_R = 58
+  const LOW_Y = -54
+  const HIGH_Y = -42
+  const CORE_LOW_Y = -49
+  const CORE_HIGH_Y = -37
+  const LEG_Y = -70
 
-  const vertsBase: Vec3[] = []
-  const vertsMid: Vec3[] = []
-  const vertsTop: Vec3[] = []
-  for (let i = 0; i < 6; i++) {
-    const a = (i / 6) * TAU
-    const jx = (rng() - 0.5) * 6
-    const jz = (rng() - 0.5) * 6
-    vertsBase.push({ x: Math.cos(a) * BASE_R + jx, y: BASE_Y + (rng() - 0.5) * 3, z: Math.sin(a) * BASE_R + jz })
-    const b = a + 0.12
-    vertsMid.push({ x: Math.cos(b) * MID_R, y: MID_Y + (rng() - 0.5) * 2, z: Math.sin(b) * MID_R })
-    const c = a + 0.06
-    vertsTop.push({ x: Math.cos(c) * TOP_R, y: TOP_Y + (rng() - 0.5) * 1.5, z: Math.sin(c) * TOP_R })
+  const lowStar: Vec3[] = []
+  const highStar: Vec3[] = []
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * TAU
+    const baseR = i % 2 === 0 ? OUTER_R : INNER_R
+    const r = baseR + (rng() - 0.5) * (i % 2 === 0 ? 6 : 4)
+    const x = Math.cos(a) * r
+    const z = Math.sin(a) * r
+    lowStar.push({ x, y: LOW_Y + (rng() - 0.5) * 1.4, z })
+    highStar.push({ x: x * 0.986, y: HIGH_Y + (rng() - 0.5) * 1.4, z: z * 0.986 })
   }
-  const hub: Vec3 = { x: 0, y: HUB_Y, z: 0 }
+
+  const coreLow: Vec3[] = []
+  const coreHigh: Vec3[] = []
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * TAU + TAU / 12
+    const x = Math.cos(a) * CORE_R
+    const z = Math.sin(a) * CORE_R
+    coreLow.push({ x, y: CORE_LOW_Y, z })
+    coreHigh.push({ x, y: CORE_HIGH_Y, z })
+  }
+  const centerLow: Vec3 = { x: 0, y: CORE_LOW_Y + 1, z: 0 }
+  const centerHigh: Vec3 = { x: 0, y: CORE_HIGH_Y + 1, z: 0 }
 
   const segs: number[] = []
   const ties: number[] = []
@@ -429,15 +438,15 @@ function generateReefStarFrame(rng: () => number): { frame: LineGeom; ties: Line
     segs.push(a.x, a.y, a.z, b.x, b.y, b.z, thick)
   }
   function addTie(p: Vec3, tangent: Vec3, thick: number) {
-    const len = 12 + rng() * 6
+    const len = 11 + rng() * 5
     ties.push(
-      p.x - tangent.x * len, p.y + 2, p.z - tangent.z * len,
-      p.x + tangent.x * len, p.y + 2, p.z + tangent.z * len,
+      p.x - tangent.x * len, p.y + 1.2, p.z - tangent.z * len,
+      p.x + tangent.x * len, p.y + 1.2, p.z + tangent.z * len,
       thick
     )
   }
   function addFragment(p: Vec3, dir: Vec3, thick: number) {
-    const len = 9 + rng() * 7
+    const len = 8 + rng() * 6
     fragments.push(
       p.x, p.y, p.z,
       p.x + dir.x * len, p.y + dir.y * len, p.z + dir.z * len,
@@ -445,62 +454,73 @@ function generateReefStarFrame(rng: () => number): { frame: LineGeom; ties: Line
     )
   }
 
-  // Base ring.
-  for (let i = 0; i < 6; i++) addSeg(vertsBase[i], vertsBase[(i + 1) % 6], 3.0)
-  // Mid ring.
-  for (let i = 0; i < 6; i++) addSeg(vertsMid[i], vertsMid[(i + 1) % 6], 2.4)
-  // Top ring.
-  for (let i = 0; i < 6; i++) addSeg(vertsTop[i], vertsTop[(i + 1) % 6], 2.05)
-  // Struts from base to mid (triangulated cage).
-  for (let i = 0; i < 6; i++) {
-    addSeg(vertsBase[i], vertsMid[i], 2.05)
-    addSeg(vertsBase[(i + 1) % 6], vertsMid[i], 1.85)
-  }
-  // Struts from mid to top (dome ribs).
-  for (let i = 0; i < 6; i++) {
-    addSeg(vertsMid[i], vertsTop[i], 1.75)
-    addSeg(vertsMid[i], vertsTop[(i + 1) % 6], 1.55)
-  }
-  // Struts from top to hub (gives the dome a "cage" crown).
-  for (let i = 0; i < 6; i++) addSeg(vertsTop[i], hub, 1.55)
-  // Cross braces on base (star-ish read).
-  for (let i = 0; i < 6; i++) addSeg(vertsBase[i], vertsBase[(i + 2) % 6], 1.45)
-  // Mid cross braces (prevents a "flat hexagon" read).
-  for (let i = 0; i < 3; i++) addSeg(vertsMid[i], vertsMid[(i + 3) % 6], 1.25)
-  // Legs (keeps it elevated above rubble).
-  for (let i = 0; i < 6; i++) {
-    const v = vertsBase[i]
-    addSeg(v, { x: v.x * 0.84, y: LEG_Y, z: v.z * 0.84 }, 1.75)
+  // Outer star perimeter on both planes.
+  for (let i = 0; i < 12; i++) {
+    addSeg(lowStar[i], lowStar[(i + 1) % 12], 2.6)
+    addSeg(highStar[i], highStar[(i + 1) % 12], 2.15)
+    addSeg(lowStar[i], highStar[i], 1.55)
   }
 
-  // Attachment anchors: vertices + mid-spokes (where fragments would be tied).
+  // Star arm ribs (tip to adjacent valleys) for the recognizable six-point silhouette.
+  for (let tip = 0; tip < 12; tip += 2) {
+    const valleyPrev = (tip + 11) % 12
+    const valleyNext = (tip + 1) % 12
+    addSeg(lowStar[tip], lowStar[valleyPrev], 1.9)
+    addSeg(lowStar[tip], lowStar[valleyNext], 1.9)
+    addSeg(highStar[tip], highStar[valleyPrev], 1.6)
+    addSeg(highStar[tip], highStar[valleyNext], 1.6)
+  }
+
+  // Central stabilization ring + spokes.
+  for (let i = 0; i < 6; i++) {
+    addSeg(coreLow[i], coreLow[(i + 1) % 6], 1.45)
+    addSeg(coreHigh[i], coreHigh[(i + 1) % 6], 1.25)
+    addSeg(coreLow[i], coreHigh[i], 1.05)
+
+    const valley = i * 2 + 1
+    addSeg(lowStar[valley], coreLow[i], 1.35)
+    addSeg(highStar[valley], coreHigh[i], 1.2)
+    addSeg(coreHigh[i], centerHigh, 1.05)
+    addSeg(coreLow[i], centerLow, 0.95)
+  }
+  addSeg(centerLow, centerHigh, 1.15)
+
+  // Short landing legs at each outer tip.
+  for (let tip = 0; tip < 12; tip += 2) {
+    const v = lowStar[tip]
+    addSeg(v, { x: v.x * 0.9, y: LEG_Y, z: v.z * 0.9 }, 1.45)
+  }
+
+  // Fragment anchors on upper-plane arm segments + inner core.
   const anchors: Vec3[] = []
+  for (let tip = 0; tip < 12; tip += 2) {
+    const valleyPrev = (tip + 11) % 12
+    const valleyNext = (tip + 1) % 12
+    const a0 = highStar[tip]
+    const a1 = highStar[valleyPrev]
+    const a2 = highStar[valleyNext]
+
+    const p1: Vec3 = { x: a0.x * 0.76 + a1.x * 0.24, y: HIGH_Y + 2.2, z: a0.z * 0.76 + a1.z * 0.24 }
+    const p2: Vec3 = { x: a0.x * 0.76 + a2.x * 0.24, y: HIGH_Y + 2.2, z: a0.z * 0.76 + a2.z * 0.24 }
+    anchors.push(p1, p2)
+
+    const ang = (tip / 12) * TAU
+    const tx = -Math.sin(ang)
+    const tz = Math.cos(ang)
+    addTie(p1, { x: tx, y: 0, z: tz }, 1.3)
+    addTie(p2, { x: tx, y: 0, z: tz }, 1.25)
+    addFragment(p1, v3.norm({ x: tx * 0.14, y: 1, z: tz * 0.14 }), 2.05)
+    addFragment(p2, v3.norm({ x: -tx * 0.14, y: 1, z: -tz * 0.14 }), 2.0)
+  }
   for (let i = 0; i < 6; i++) {
-    const vb = vertsBase[i]
-    const vm = vertsMid[i]
-    const vt = vertsTop[i]
-    anchors.push({ x: vb.x * 0.92, y: vb.y + 2, z: vb.z * 0.92 })
-    anchors.push({ x: vm.x * 0.98, y: vm.y + 2, z: vm.z * 0.98 })
-    anchors.push({ x: vt.x * 0.98, y: vt.y + 2, z: vt.z * 0.98 })
-
-    // Tie stroke tangent around the ring.
-    const a = (i / 6) * TAU
-    const tx = -Math.sin(a)
-    const tz = Math.cos(a)
-    addTie({ x: vb.x * 0.78, y: vb.y, z: vb.z * 0.78 }, { x: tx, y: 0, z: tz }, 1.4)
-    addTie({ x: vt.x * 0.86, y: vt.y, z: vt.z * 0.86 }, { x: tx, y: 0, z: tz }, 1.2)
-
-    // Fragment stubs (look like strapped coral pieces at Month 0).
-    addFragment(
-      { x: vb.x * 0.92, y: vb.y + 2, z: vb.z * 0.92 },
-      v3.norm({ x: tx * 0.15, y: 1, z: tz * 0.15 }),
-      2.2
-    )
-    addFragment(
-      { x: vt.x * 0.98, y: vt.y + 1.5, z: vt.z * 0.98 },
-      v3.norm({ x: tx * 0.10, y: 1, z: tz * 0.10 }),
-      1.95
-    )
+    const cpt = coreHigh[i]
+    const ang = (i / 6) * TAU + TAU / 12
+    const tx = -Math.sin(ang)
+    const tz = Math.cos(ang)
+    const p: Vec3 = { x: cpt.x, y: cpt.y + 2.2, z: cpt.z }
+    anchors.push(p)
+    addTie(p, { x: tx, y: 0, z: tz }, 1.1)
+    addFragment(p, v3.norm({ x: tx * 0.08, y: 1, z: tz * 0.08 }), 1.75)
   }
 
   return { frame: generateLinesGeom(segs), ties: generateLinesGeom(ties), fragments: generateLinesGeom(fragments), anchors }
@@ -590,8 +610,8 @@ function generateScene(w: number, h: number, mode: CanvasMode): Scene {
     placements.push({ offset: { x: 0, y: 0, z: 0 }, scale: 1.25, colonies: 7, start: 9999, span: 1, fade: 1 })
 
     const rings = [
-      { count: 7, r: 360, y: -8, scale: 1.05, colonies: 6 },
-      { count: 11, r: 560, y: -16, scale: 0.92, colonies: 5 },
+      { count: 7, r: 360, y: 0, scale: 1.05, colonies: 6 },
+      { count: 11, r: 560, y: 0, scale: 0.92, colonies: 5 },
     ]
     for (let ringIndex = 0; ringIndex < rings.length; ringIndex++) {
       const ring = rings[ringIndex]
@@ -600,7 +620,8 @@ function generateScene(w: number, h: number, mode: CanvasMode): Scene {
         const jr = (rng() - 0.5) * 34
         const ox = Math.cos(a) * (ring.r + jr)
         const oz = Math.sin(a) * (ring.r + jr)
-        const oy = ring.y + (rng() - 0.5) * 18
+        // Keep all bommies rooted on one common plane for a true landscape read.
+        const oy = ring.y
         const dist = Math.sqrt(ox * ox + oz * oz)
         const t = dist / 560
         const start = t > 0.82 ? 1998 : t > 0.62 ? 2010 : 2014
@@ -767,12 +788,13 @@ function renderBloom(scene: Scene, health: number, cx: number, cy: number, mode:
   const [r, g, b] = mode === 'reef-health'
     // Healthy: luminous teal waterlight; stressed: warm “heat haze” tint.
     ? lerpRgb('#08304a', '#3b1a0c', bloomT)
-    : lerpRgb('#03060a', '#071812', bloomT)
+    // Reef Star Growth now shares the same blue-water backdrop direction.
+    : lerpRgb('#0a2f48', '#10354f', bloomT)
 
   const str = mode === 'reef-health'
     // Lift exposure so early monitored years aren't a near-black silhouette.
     ? (0.16 + 0.34 * health01)
-    : (0.03 + 0.14 * health01)
+    : (0.10 + 0.18 * health01)
 
   const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(w, h) * 0.55)
   grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${str})`)
@@ -996,12 +1018,13 @@ function drawFrame(
   const cy   = mode === 'reef-health' ? (h * 0.50) : (h * 0.54)
   const ox = cx + panX
   const oy = cy + panY
-  const rotY = (t / ROT_PERIOD) * TAU
+  // Auto-rotation disabled: keep a fixed camera-facing angle for both modes.
+  const rotY = mode === 'reef-health' ? STATIC_ROT_Y_HEALTH : STATIC_ROT_Y_STAR
 
   scene.frame++
 
-  // Background: keep Reef Health brighter so coral reads; keep Reef Star a black studio void.
-  ctx.fillStyle = mode === 'reef-health' ? '#071c33' : '#000'
+  // Shared blue ocean backdrop for both modes.
+  ctx.fillStyle = '#071c33'
   ctx.fillRect(0, 0, w, h)
 
   // Cache health-driven styles (only changes while scrubbing the slider).
@@ -1056,7 +1079,7 @@ function drawFrame(
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
 
-  // Reef Star frame (growth mode): visible at Month 0, gradually engulfed by coral by Month 48.
+  // Reef Star frame (growth mode): visible at Month 0 and progressively overgrown through Month 72.
   if (mode === 'reef-star-growth' && scene.reefStarFrame) {
     const frame = scene.reefStarFrame
     const ties = scene.reefStarTies

@@ -19,7 +19,7 @@ Reference 3–5 credible patterns (major NGOs, modern processor flows, or establ
 ## Codebase constraints
 
 - Match existing React patterns and `site.css` typography, spacing, and surface styles.
-- Preserve `VITE_DONATION_URL` and `VITE_DONATION_EMAIL` behavior and query params (`amount`, `frequency`) on the configured URL unless the user explicitly changes the env contract.
+- Preserve `VITE_DONATION_URL` and `VITE_DONATION_EMAIL` behavior and query params (`amount`, `frequency`) on the configured URL unless the user explicitly changes the env contract. Optional: `VITE_DONATION_PROCESSOR_LABEL`, `VITE_DONATION_SUPPORT_EMAIL`.
 - Do **not** add a “where funds go” / percentage allocation breakdown unless the user supplies final copy and verified splits.
 
 ## Related styles

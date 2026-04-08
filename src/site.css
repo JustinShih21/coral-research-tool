@@ -660,7 +660,7 @@ h1, h2, h3 {
 
 .donation-hero,
 .donation-builder,
-.donation-allocation,
+.donation-pillars,
 .donation-faq {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -735,7 +735,7 @@ h1, h2, h3 {
 
 .donation-form h2,
 .donation-impact h2,
-.donation-allocation h2,
+.donation-pillars-heading,
 .donation-faq h2 {
   margin: 0;
   font-family: var(--font-display);
@@ -772,10 +772,15 @@ h1, h2, h3 {
 }
 
 .donation-amount-grid button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
   border: 1px solid #e3ccaa;
   border-radius: 8px;
   background: #fff;
-  padding: 0.56rem 0.65rem;
+  padding: 0.5rem 0.55rem;
   font-size: 0.85rem;
   font-weight: 700;
   color: var(--color-text);
@@ -785,6 +790,18 @@ h1, h2, h3 {
   border-color: #86ab9f;
   background: #ecfff5;
   color: var(--color-primary-dark);
+}
+
+.donation-amt-value {
+  line-height: 1.2;
+}
+
+.donation-amt-popular {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-primary);
 }
 
 .donation-custom-input {
@@ -825,6 +842,84 @@ h1, h2, h3 {
   margin: 0.65rem 0 0;
   color: var(--color-text-muted);
   font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.donation-trust-foot {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed #e0d0bc;
+}
+
+.donation-trust-foot p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
+.donation-inline-link {
+  font-weight: 700;
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.donation-inline-link:hover {
+  text-decoration: underline;
+}
+
+.donation-pillars {
+  padding: 1.05rem;
+}
+
+.donation-pillars-heading {
+  margin: 0 0 0.55rem;
+}
+
+.donation-pillars-list {
+  margin: 0;
+  padding-left: 1.15rem;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.donation-pillars-list li {
+  margin-bottom: 0.35rem;
+}
+
+.donation-sticky-give {
+  display: none;
+}
+
+.donation-sticky-give-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.72rem 1rem;
+  border-radius: 12px 12px 0 0;
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.9rem;
+  text-decoration: none;
+  box-shadow: 0 -4px 20px rgba(15, 118, 110, 0.18);
+}
+
+.donation-sticky-give-btn:hover {
+  background: var(--color-primary-dark);
+}
+
+.donation-sticky-label {
+  flex-shrink: 0;
+}
+
+.donation-sticky-amt {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.95;
 }
 
 .donation-impact > p {
@@ -856,57 +951,8 @@ h1, h2, h3 {
   font-size: 0.8rem;
 }
 
-.donation-allocation,
 .donation-faq {
   padding: 1.05rem;
-}
-
-.donation-allocation > p {
-  margin: 0.45rem 0 0;
-  color: var(--color-text-muted);
-}
-
-.donation-allocation-list {
-  margin-top: 0.8rem;
-  display: grid;
-  gap: 0.5rem;
-}
-
-.donation-allocation-row {
-  border: 1px solid #e7d0af;
-  border-radius: 9px;
-  background: #fffaf0;
-  padding: 0.6rem 0.7rem;
-}
-
-.donation-allocation-label {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
-.donation-allocation-label span {
-  font-size: 0.86rem;
-  color: var(--color-text-muted);
-}
-
-.donation-allocation-label strong {
-  font-size: 0.9rem;
-}
-
-.donation-allocation-track {
-  margin-top: 0.45rem;
-  height: 11px;
-  border-radius: 999px;
-  background: rgba(133, 103, 47, 0.12);
-  overflow: hidden;
-}
-
-.donation-allocation-track i {
-  display: block;
-  height: 100%;
-  background: linear-gradient(90deg, #0f766e 0%, #86a41a 58%, #d97706 100%);
 }
 
 .donation-faq-list {
@@ -1808,6 +1854,28 @@ h1, h2, h3 {
 }
 
 @media (max-width: 640px) {
+  .donation-page {
+    padding-bottom: 4.75rem;
+  }
+
+  .donation-sticky-give {
+    display: block;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 30;
+    padding: 0 0.5rem;
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+    pointer-events: none;
+  }
+
+  .donation-sticky-give-btn {
+    pointer-events: auto;
+    max-width: 42rem;
+    margin: 0 auto;
+  }
+
   .site-main {
     width: calc(100% - 1rem);
     padding: 1rem 0 1.5rem;

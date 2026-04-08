@@ -5,8 +5,9 @@ Internal tool for the Indonesia Coral Reef Restoration Finance Research project.
 ## Run locally
 
 1. Copy `.env.example` to `.env` and set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (or use the existing `.env` if present).
-2. In the [Supabase SQL Editor](https://supabase.com/dashboard), run the script in `supabase-schema.sql` to create the `research_data` table.
-3. Then:
+2. In the [Supabase SQL Editor](https://supabase.com/dashboard), run `supabase-schema.sql` to create the `research_data` table (and profiles/trigger if you use that section).
+3. For **team photo uploads** on `/team/manage`, run `team-photos-storage.sql` in the SQL Editor (same as the Storage block at the bottom of `supabase-schema.sql`).
+4. Then:
 
 ```bash
 npm install
@@ -47,5 +48,7 @@ Output is in `dist/`.
 Set environment variables in the Vercel project: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Ensure the `research_data` table exists in Supabase (run `supabase-schema.sql`).
 
 Optional donation configuration:
-- `VITE_DONATION_URL` — external donation processor URL (Stripe payment link, Givebutter, Donorbox, etc.); the app appends `amount` and `frequency` query params.
+- `VITE_DONATION_URL` — external donation processor URL (Stripe payment link, Givebutter, Donorbox, etc.); the app appends `amount` and `frequency` query params (existing query params on the URL are preserved).
 - `VITE_DONATION_EMAIL` — fallback email address for pledge flow when `VITE_DONATION_URL` is not set.
+- `VITE_DONATION_PROCESSOR_LABEL` — short name shown on `/donate` (e.g. `Stripe`) so donors know which checkout they are entering.
+- `VITE_DONATION_SUPPORT_EMAIL` — optional; used in FAQ copy and the contact line. Defaults to `VITE_DONATION_EMAIL`.
