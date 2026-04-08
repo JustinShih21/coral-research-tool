@@ -14,6 +14,7 @@ export default function Layout({ children }: { children?: React.ReactNode }) {
   const publicNav = [
     { to: '/', label: 'Home' },
     { to: '/reef-health', label: 'Reef Health' },
+    { to: '/team', label: 'Meet the team' },
     { to: '/donate', label: 'Donate' },
     { to: '/library', label: 'Research Library' },
     { to: '/network', label: 'Stakeholder Network' },
@@ -22,12 +23,14 @@ export default function Layout({ children }: { children?: React.ReactNode }) {
   const fullNav = [
     { to: '/', label: 'Home' },
     { to: '/reef-health', label: 'Reef Health' },
+    { to: '/team', label: 'Meet the team' },
     { to: '/donate', label: 'Donate' },
     { to: '/library', label: 'Research Library' },
     { to: '/network', label: 'Stakeholder Network' },
     { to: '/hypotheses', label: 'Hypothesis Tracker' },
     { to: '/interview', label: 'Interview Protocol' },
     { to: '/leon-living-seas', label: 'Leon + Living Seas' },
+    { to: '/team/manage', label: 'Manage team' },
   ]
 
   const navItems = user ? fullNav : publicNav

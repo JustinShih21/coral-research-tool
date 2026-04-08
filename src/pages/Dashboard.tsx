@@ -9,6 +9,7 @@ import {
   analyticalQuestions,
   expectedOutcomes,
 } from '@/data/researchFramework'
+import { Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { getResearchData, setResearchData, RESEARCH_KEYS } from '@/lib/researchStorage'
 
@@ -108,6 +109,23 @@ export default function Dashboard() {
     <div className="dashboard">
       <h1>Research Program Dashboard</h1>
       <p className="dashboard-intro">Indonesia coral reef financing research workspace.</p>
+      {user && (
+        <section className="dashboard-panel dashboard-team-links">
+          <h2>Team directory</h2>
+          <p className="dashboard-paragraph">
+            Edit public bios, cohorts, and team story. Visitors use <strong>Meet the team</strong>; only logged-in
+            members can open the editor.
+          </p>
+          <div className="dashboard-team-actions">
+            <Link to="/team" className="dashboard-team-link">
+              View meet the team page
+            </Link>
+            <Link to="/team/manage" className="dashboard-team-link dashboard-team-link-primary">
+              Manage team profiles
+            </Link>
+          </div>
+        </section>
+      )}
       <section className="dashboard-panel">
         <h2>Project Mission</h2>
         {projectMission.map((statement) => (

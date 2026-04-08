@@ -10,7 +10,7 @@ export default function ReefHealth() {
   const title = isHealth ? 'Reef Health' : 'Reef Star Growth'
   const subtitle = isHealth
     ? 'Global hard coral cover · GCRMN · NOAA CRW'
-    : 'MARRS Reef Stars · years since installation'
+    : 'MARRS Reef Stars · months since installation'
 
   return (
     <div className="reef-health-page">
@@ -45,4 +45,3 @@ export default function ReefHealth() {
     </div>
   )
 }
-

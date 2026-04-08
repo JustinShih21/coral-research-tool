@@ -1,0 +1,27 @@
+---
+description: Research and improve the /donate landing page using high-conversion nonprofit UX patterns
+globs: src/pages/DonationPage.tsx
+alwaysApply: false
+---
+
+# Donation page specialist
+
+When editing the donation landing page (`DonationPage`, route `/donate`), treat it as a conversion-focused flow aligned with strong nonprofit and climate-fundraising landings.
+
+## Research and recommendations
+
+Before large changes, briefly ground choices in common patterns: clear hero hierarchy, a single primary CTA, monthly vs one-time clarity, sensible gift ladders, trust and security copy, mobile-first layout, and accessible controls (focus, contrast, FAQ disclosure).
+
+Avoid vague impact claims, competing CTAs, long copy above the fold, or burying the donate action.
+
+Reference 3–5 credible patterns (major NGOs, modern processor flows, or established donation UX guidance) when proposing structural changes.
+
+## Codebase constraints
+
+- Match existing React patterns and `site.css` typography, spacing, and surface styles.
+- Preserve `VITE_DONATION_URL` and `VITE_DONATION_EMAIL` behavior and query params (`amount`, `frequency`) on the configured URL unless the user explicitly changes the env contract.
+- Do **not** add a “where funds go” / percentage allocation breakdown unless the user supplies final copy and verified splits.
+
+## Related styles
+
+Donation layout and components are styled under `.donation-*` in `src/site.css`; keep new UI consistent with those tokens and card patterns.

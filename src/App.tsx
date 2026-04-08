@@ -16,6 +16,9 @@ const CaseStudies = lazy(() => import('./pages/CaseStudies'))
 const ResearchLibrary = lazy(() => import('./pages/ResearchLibrary'))
 const Contacts = lazy(() => import('./pages/Contacts'))
 const LeonLivingSeasBriefing = lazy(() => import('./pages/LeonLivingSeasBriefing'))
+const TeamPage = lazy(() => import('./pages/TeamPage'))
+const TeamMemberPage = lazy(() => import('./pages/TeamMemberPage'))
+const TeamManagePage = lazy(() => import('./pages/TeamManagePage'))
 
 function PageLoading() {
   return <div className="page-loading">Loading…</div>
@@ -32,6 +35,8 @@ export default function App() {
               <Route path="/" element={<Suspense fallback={<PageLoading />}><HomePage /></Suspense>} />
               <Route path="/reef-health" element={<Suspense fallback={<PageLoading />}><ReefHealth /></Suspense>} />
               <Route path="/donate" element={<Suspense fallback={<PageLoading />}><DonationPage /></Suspense>} />
+              <Route path="/team" element={<Suspense fallback={<PageLoading />}><TeamPage /></Suspense>} />
+              <Route path="/team/member/:slug" element={<Suspense fallback={<PageLoading />}><TeamMemberPage /></Suspense>} />
               <Route path="/research" element={<Suspense fallback={<PageLoading />}><Dashboard /></Suspense>} />
               <Route path="/dashboard" element={<Navigate to="/research" replace />} />
               <Route path="/network" element={<Suspense fallback={<PageLoading />}><StakeholderNetworkPage /></Suspense>} />
@@ -59,6 +64,14 @@ export default function App() {
                 element={
                   <Suspense fallback={<PageLoading />}>
                     <TeamOnlyRoute><LeonLivingSeasBriefing /></TeamOnlyRoute>
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/team/manage"
+                element={
+                  <Suspense fallback={<PageLoading />}>
+                    <TeamOnlyRoute><TeamManagePage /></TeamOnlyRoute>
                   </Suspense>
                 }
               />
