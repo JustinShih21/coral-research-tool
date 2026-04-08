@@ -48,20 +48,37 @@ const STAR_LAST = 4
 const STAR_SPAN = STAR_LAST - STAR_FIRST
 const STAR_TICKS = [0, 1, 2, 3, 4] as const
 
-function easeInOutCubic(t: number) {
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
-}
-
 function growthHealthAtAge(ageYears: number): number {
-  // 0 → 4 years since installation, eased so early changes feel visible.
+  // 0 → 4 years since installation.
+  // Use an ease-out curve so Year 1 already looks meaningfully different (storytelling goal).
   const a = Math.max(STAR_FIRST, Math.min(STAR_LAST, ageYears))
   const t = STAR_SPAN === 0 ? 0 : (a - STAR_FIRST) / STAR_SPAN
-  return 100 * easeInOutCubic(t)
+  return 100 * Math.pow(t, 0.65)
 }
 
 function reefHealthIndexAtYear(year: number): { health: number; noaaAsOfDate?: string } {
   const sample = reefHealthAtYear(year)
   return { health: sample.health, noaaAsOfDate: sample.noaaAsOfDate }
+}
+
+function reefHeatStressOverlay01(year: number): number {
+  // Visual storytelling overlay (not displayed as explanatory UI text):
+  // We intensify stress during NOAA/GCRMN-linked global bleaching periods so the reef can visibly deteriorate,
+  // even when the underlying monitored global-cover series changes slowly.
+  // NOAA CRW confirms major global bleaching event years (1998, 2010, 2014–2017, and the ongoing 4th event from 2023+).
+  if (year >= 2024) return 0.45
+  if (year >= 2016) return 0.32
+  if (year >= 2014) return 0.22
+  if (year >= 2010) return 0.14
+  if (year >= 1998) return 0.08
+  return 0
+}
+
+function reefHealthVisualAtYear(year: number): { health: number; noaaAsOfDate?: string } {
+  const base = reefHealthIndexAtYear(year)
+  const overlay = reefHeatStressOverlay01(year)
+  const health = Math.max(0, Math.min(100, base.health - overlay * 100))
+  return { health, noaaAsOfDate: base.noaaAsOfDate }
 }
 
 // ─── Scene constants ──────────────────────────────────────────────────────────
@@ -128,14 +145,18 @@ function lerpColor(a: string, b: string, t: number): string {
   const [r2, g2, b2] = hexToRgb(b)
   return `rgb(${Math.round(r1 + (r2 - r1) * tc)},${Math.round(g1 + (g2 - g1) * tc)},${Math.round(b1 + (b2 - b1) * tc)})`
 }
-const RUBBLE_COLOR = '#2a2a2d'
+const STAR_FRAGMENT_COLOR = '#7a5f3f'
+const DEAD_ALGAE_COLOR = '#5a564c'
 function coralColor(mode: CanvasMode, colorIndex: number, health: number): string {
   if (mode === 'reef-star-growth') {
     const t = Math.max(0, Math.min(1, health / 100))
-    return lerpColor(RUBBLE_COLOR, HEALTHY_COLORS[colorIndex % 4], t)
+    return lerpColor(STAR_FRAGMENT_COLOR, HEALTHY_COLORS[colorIndex % 4], Math.pow(t, 0.85))
   }
-  const t = Math.max(0, Math.min(1, (100 - health) / 50))
-  return lerpColor(HEALTHY_COLORS[colorIndex % 4], BLEACH_COLOR, t)
+  // Keep the reef vibrant until a clear stress threshold, then push into stark bleaching.
+  const bleachT = Math.max(0, Math.min(1, (92 - health) / 55))
+  const algaeT = Math.max(0, Math.min(1, (48 - health) / 48))
+  const bleached = lerpColor(HEALTHY_COLORS[colorIndex % 4], BLEACH_COLOR, bleachT)
+  return lerpColor(bleached, DEAD_ALGAE_COLOR, algaeT * 0.85)
 }
 
 // ─── Scene ────────────────────────────────────────────────────────────────────
@@ -143,13 +164,28 @@ function coralColor(mode: CanvasMode, colorIndex: number, health: number): strin
 type GroupStart = [number, number, number, number, number]
 type ColorCache = [string, string, string, string]
 
-interface Scene {
+interface ReefGeom {
   // Geometry: [p1x, p1y, p1z, p2x, p2y, p2z, thickness, colorIndex] × N
   geom: Float32Array
   // Projected: [sx1, sy1, sx2, sy2, midZ] × N (kept in the same order as geom)
   proj: Float32Array
+  // Per-segment tip factor (0 = base/core, 1 = outermost tips). Used for tissue-loss/growth reveal.
+  tip: Float32Array
   // Pre-sorted by colorIndex: groupStart boundaries for 4 color groups
   groupStart: GroupStart
+}
+
+interface LineGeom {
+  // Geometry: [p1x, p1y, p1z, p2x, p2y, p2z, thickness] × N
+  geom: Float32Array
+  // Projected: [sx1, sy1, sx2, sy2, midZ] × N
+  proj: Float32Array
+}
+
+interface Scene {
+  reefs: ReefGeom[]
+  colonyCount: number
+  segmentsTotal: number
 
   // Fish params (orbit order): [rx, rz, y, phase, speed, bodyLen, bodyH, colorIndex] × 12
   fish: Float32Array
@@ -164,76 +200,102 @@ interface Scene {
   bloomCtx: CanvasRenderingContext2D
   lastBloomHealthKey: number
 
+  // Subtle post overlays (cached, no per-frame allocations).
+  vignetteCanvas: HTMLCanvasElement
+  grainCanvas: HTMLCanvasElement
+
+  // Reef Star frame (growth mode only).
+  reefStarFrame?: LineGeom
+  reefStarTies?: LineGeom
+
   frame: number
   w: number
   h: number
 }
 
-/**
- * Colony positions on the hemisphere:
- * phi  = polar angle from top (0° = apex, 90° = equator)
- * alpha = azimuthal angle around Y axis
- */
-const COLONY_LAYOUT = [
-  // Apex cluster: 2 colonies
-  { phi:  18, alpha:  60 },
-  { phi:  18, alpha: 240 },
-  // Ring 2: 4 colonies
-  { phi:  38, alpha:   0 },
-  { phi:  38, alpha:  90 },
-  { phi:  38, alpha: 180 },
-  { phi:  38, alpha: 270 },
-  // Ring 3: 5 colonies
-  { phi:  60, alpha:  36 },
-  { phi:  60, alpha: 108 },
-  { phi:  60, alpha: 180 },
-  { phi:  60, alpha: 252 },
-  { phi:  60, alpha: 324 },
-  // Base ring: 5 colonies
-  { phi:  80, alpha:  18 },
-  { phi:  80, alpha:  90 },
-  { phi:  80, alpha: 162 },
-  { phi:  80, alpha: 234 },
-  { phi:  80, alpha: 306 },
-]
+function makeRng(seed: number): () => number {
+  // Deterministic LCG (fast, good enough for layout jitter).
+  let s = seed >>> 0
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0
+    return s / 4294967296
+  }
+}
+
+function randPerp(rng: () => number, v: Vec3): Vec3 {
+  for (let i = 0; i < 12; i++) {
+    const r = v3.norm({ x: rng() - 0.5, y: rng() - 0.5, z: rng() - 0.5 })
+    const d = v3.dot(r, v)
+    const p = v3.norm({ x: r.x - d * v.x, y: r.y - d * v.y, z: r.z - d * v.z })
+    if (p.x * p.x + p.y * p.y + p.z * p.z > 0.05) return p
+  }
+  return { x: 1, y: 0, z: 0 }
+}
 
 function buildBranches3D(
   p1: Vec3, dir: Vec3, length: number, thickness: number,
-  depth: number, spreadRad: number, colorIndex: number,
-  result: number[][]
+  depth: number, maxDepth: number, spreadRad: number, colorIndex: number,
+  result: number[][],
+  tipResult: number[][],
+  rng: () => number
 ): void {
   if (depth < 0 || length < 0.5) return
   const p2 = v3.add(p1, v3.scale(dir, length))
   const out = result[colorIndex % 4]
   out.push(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z, thickness)
+  tipResult[colorIndex % 4].push(1 - depth / Math.max(1, maxDepth))
 
-  const spread = spreadRad * (0.82 + Math.random() * 0.36)
-  const perp   = v3.randPerp(dir)
+  const spread = spreadRad * (0.82 + rng() * 0.36)
+  const perp   = randPerp(rng, dir)
   const d1     = v3.norm(v3.rotAround(dir, perp,  spread))
   const d2     = v3.norm(v3.rotAround(dir, perp, -spread))
   // Twist around growth axis so branches spread in full 3D
-  const twist  = (Math.random() - 0.5) * 1.4
+  const twist  = (rng() - 0.5) * 1.4
   const dt1    = v3.norm(v3.rotAround(d1, dir,  twist))
   const dt2    = v3.norm(v3.rotAround(d2, dir, -twist))
 
-  buildBranches3D(p2, dt1, length * 0.68, thickness * 0.72, depth - 1, spreadRad, colorIndex, result)
-  buildBranches3D(p2, dt2, length * 0.68, thickness * 0.72, depth - 1, spreadRad, colorIndex, result)
+  buildBranches3D(p2, dt1, length * 0.68, thickness * 0.72, depth - 1, maxDepth, spreadRad, colorIndex, result, tipResult, rng)
+  buildBranches3D(p2, dt2, length * 0.68, thickness * 0.72, depth - 1, maxDepth, spreadRad, colorIndex, result, tipResult, rng)
 }
 
-function generateScene(w: number, h: number): Scene {
+function buildReefLayout(colonyCount: number, rng: () => number): Array<{ phi: number; alpha: number }> {
+  if (colonyCount <= 0) return []
+  const layout: Array<{ phi: number; alpha: number }> = []
+  // Always include an apex colony to keep the silhouette monumental/vertical (ARBORIST principle).
+  layout.push({ phi: 18 + rng() * 6, alpha: rng() * 360 })
+  for (let i = 1; i < colonyCount; i++) {
+    const ringT = (i - 1) / Math.max(1, colonyCount - 2)
+    const phi = 40 + ringT * 42 + (rng() - 0.5) * 10
+    const alpha = rng() * 360
+    layout.push({ phi, alpha })
+  }
+  return layout
+}
+
+function generateReefGeom(
+  offset: Vec3,
+  scale: number,
+  colonyLayout: Array<{ phi: number; alpha: number }>,
+  rng: () => number
+): { reef: ReefGeom; colonies: number } {
   const branchesByColor: number[][] = [[], [], [], []]
+  const tipByColor: number[][] = [[], [], [], []]
   const UP: Vec3 = { x: 0, y: 1, z: 0 }
 
-  COLONY_LAYOUT.forEach(({ phi, alpha }, i) => {
+  const bommieR = BOMMIE_R * scale
+  const branchLen = BRANCH_LEN * scale
+
+  colonyLayout.forEach(({ phi, alpha }, i) => {
     const phiR   = (phi   * Math.PI) / 180
     const alphaR = (alpha * Math.PI) / 180
 
-    const origin: Vec3 = {
-      x: BOMMIE_R * Math.sin(phiR) * Math.cos(alphaR),
-      y: BOMMIE_R * Math.cos(phiR),
-      z: BOMMIE_R * Math.sin(phiR) * Math.sin(alphaR),
+    const local: Vec3 = {
+      x: bommieR * Math.sin(phiR) * Math.cos(alphaR),
+      y: bommieR * Math.cos(phiR),
+      z: bommieR * Math.sin(phiR) * Math.sin(alphaR),
     }
-    const normal = v3.norm(origin)
+    const origin: Vec3 = v3.add(offset, local)
+    const normal = v3.norm(local)
 
     // Apex colonies grow mostly vertical; base colonies lean outward
     const blend  = phi < 45 ? 0.52 : 0.72
@@ -244,16 +306,20 @@ function generateScene(w: number, h: number): Scene {
     })
 
     const spreadRad = phi < 42
-      ? (26 + Math.random() * 9)  * Math.PI / 180
-      : (36 + Math.random() * 12) * Math.PI / 180
+      ? (26 + rng() * 9)  * Math.PI / 180
+      : (36 + rng() * 12) * Math.PI / 180
 
+    const maxDepth = phi < 42 ? 5 : 4
     buildBranches3D(
-      origin, growDir, BRANCH_LEN,
-      4.6 + Math.random() * 1.4,
-      phi < 42 ? 5 : 4,
+      origin, growDir, branchLen,
+      (4.6 + rng() * 1.4) * scale,
+      maxDepth,
+      maxDepth,
       spreadRad,
       i % 4,
-      branchesByColor
+      branchesByColor,
+      tipByColor,
+      rng
     )
   })
 
@@ -264,9 +330,13 @@ function generateScene(w: number, h: number): Scene {
   const total  = group0 + group1 + group2 + group3
 
   const geom = new Float32Array(total * 8)
+  const tip = new Float32Array(total)
   let writeIdx = 0
+  let segIdx = 0
   for (let colorIndex = 0; colorIndex < 4; colorIndex++) {
     const src = branchesByColor[colorIndex]
+    const tipSrc = tipByColor[colorIndex]
+    let k = 0
     for (let j = 0; j < src.length; j += 7) {
       geom[writeIdx + 0] = src[j + 0]
       geom[writeIdx + 1] = src[j + 1]
@@ -276,7 +346,10 @@ function generateScene(w: number, h: number): Scene {
       geom[writeIdx + 5] = src[j + 5]
       geom[writeIdx + 6] = src[j + 6]
       geom[writeIdx + 7] = colorIndex
+      tip[segIdx] = tipSrc[k] ?? 0
       writeIdx += 8
+      segIdx++
+      k++
     }
   }
 
@@ -288,23 +361,193 @@ function generateScene(w: number, h: number): Scene {
     total,
   ]
 
+  const proj = new Float32Array(total * 5)
+  return { reef: { geom, proj, tip, groupStart }, colonies: colonyLayout.length }
+}
+
+function generateLinesGeom(segments: number[]): LineGeom {
+  const geom = new Float32Array(segments)
+  const count = segments.length / 7
+  const proj = new Float32Array(count * 5)
+  return { geom, proj }
+}
+
+function generateReefStarFrame(rng: () => number): { frame: LineGeom; ties: LineGeom; anchors: Vec3[] } {
+  // A simplified "Reef Star" (hex ring + spokes + diagonals), plus small "tie" strokes.
+  // Visual reference: MARRS Reef Stars are steel frames coated with coral sand/resin, with coral fragments attached.
+  const STAR_R = 120
+  const STAR_Y = -52
+
+  const verts: Vec3[] = []
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * TAU
+    verts.push({ x: Math.cos(a) * STAR_R, y: STAR_Y, z: Math.sin(a) * STAR_R })
+  }
+  const center: Vec3 = { x: 0, y: STAR_Y, z: 0 }
+
+  const segs: number[] = []
+  const ties: number[] = []
+
+  function addSeg(a: Vec3, b: Vec3, thick: number) {
+    segs.push(a.x, a.y, a.z, b.x, b.y, b.z, thick)
+  }
+  function addTie(p: Vec3, tangent: Vec3, thick: number) {
+    const len = 12 + rng() * 6
+    ties.push(
+      p.x - tangent.x * len, p.y + 2, p.z - tangent.z * len,
+      p.x + tangent.x * len, p.y + 2, p.z + tangent.z * len,
+      thick
+    )
+  }
+
+  // Hex ring.
+  for (let i = 0; i < 6; i++) addSeg(verts[i], verts[(i + 1) % 6], 2.6)
+  // Spokes.
+  for (let i = 0; i < 6; i++) addSeg(verts[i], center, 2.2)
+  // Diagonals for a more "star" read.
+  for (let i = 0; i < 6; i++) addSeg(verts[i], verts[(i + 2) % 6], 1.8)
+
+  // Attachment anchors: vertices + mid-spokes (where fragments would be tied).
+  const anchors: Vec3[] = []
+  for (let i = 0; i < 6; i++) {
+    const v = verts[i]
+    anchors.push({ x: v.x, y: v.y + 4, z: v.z })
+    anchors.push({ x: v.x * 0.55, y: v.y + 3, z: v.z * 0.55 })
+
+    // Tie stroke tangent around the ring.
+    const a = (i / 6) * TAU
+    const tx = -Math.sin(a)
+    const tz = Math.cos(a)
+    addTie({ x: v.x * 0.80, y: v.y, z: v.z * 0.80 }, { x: tx, y: 0, z: tz }, 1.4)
+  }
+
+  return { frame: generateLinesGeom(segs), ties: generateLinesGeom(ties), anchors }
+}
+
+function generateCoralFromAnchors(anchors: Vec3[], rng: () => number): { reef: ReefGeom; colonies: number } {
+  const branchesByColor: number[][] = [[], [], [], []]
+  const tipByColor: number[][] = [[], [], [], []]
+
+  for (let i = 0; i < anchors.length; i++) {
+    const origin = anchors[i]
+    const outward = v3.norm({ x: origin.x, y: 0, z: origin.z })
+    const growDir = v3.norm({ x: outward.x * 0.22, y: 1, z: outward.z * 0.22 })
+
+    const spreadRad = (26 + rng() * 12) * Math.PI / 180
+    const maxDepth = 6
+    buildBranches3D(
+      origin,
+      growDir,
+      24,
+      3.4 + rng() * 1.0,
+      maxDepth,
+      maxDepth,
+      spreadRad,
+      i % 4,
+      branchesByColor,
+      tipByColor,
+      rng
+    )
+  }
+
+  const group0 = branchesByColor[0].length / 7
+  const group1 = branchesByColor[1].length / 7
+  const group2 = branchesByColor[2].length / 7
+  const group3 = branchesByColor[3].length / 7
+  const total  = group0 + group1 + group2 + group3
+
+  const geom = new Float32Array(total * 8)
+  const tip = new Float32Array(total)
+  let writeIdx = 0
+  let segIdx = 0
+  for (let colorIndex = 0; colorIndex < 4; colorIndex++) {
+    const src = branchesByColor[colorIndex]
+    const tipSrc = tipByColor[colorIndex]
+    let k = 0
+    for (let j = 0; j < src.length; j += 7) {
+      geom[writeIdx + 0] = src[j + 0]
+      geom[writeIdx + 1] = src[j + 1]
+      geom[writeIdx + 2] = src[j + 2]
+      geom[writeIdx + 3] = src[j + 3]
+      geom[writeIdx + 4] = src[j + 4]
+      geom[writeIdx + 5] = src[j + 5]
+      geom[writeIdx + 6] = src[j + 6]
+      geom[writeIdx + 7] = colorIndex
+      tip[segIdx] = tipSrc[k] ?? 0
+      writeIdx += 8
+      segIdx++
+      k++
+    }
+  }
+
+  const groupStart: GroupStart = [
+    0,
+    group0,
+    group0 + group1,
+    group0 + group1 + group2,
+    total,
+  ]
+
+  const proj = new Float32Array(total * 5)
+  return { reef: { geom, proj, tip, groupStart }, colonies: anchors.length }
+}
+
+function generateScene(w: number, h: number, mode: CanvasMode): Scene {
+  const reefs: ReefGeom[] = []
+  let colonyCount = 0
+  let reefStarFrame: LineGeom | undefined
+  let reefStarTies: LineGeom | undefined
+
+  if (mode === 'reef-health') {
+    // A small reef field early, tapering down to a single survivor by TODAY.
+    const offsets: Vec3[] = [
+      { x: 0, y: 0, z: 0 },
+      { x: -220, y: -6, z: 110 },
+      { x: 220, y: 6, z: 80 },
+      { x: -140, y: 10, z: -190 },
+      { x: 150, y: -10, z: -160 },
+      { x: 0, y: 18, z: 240 },
+    ]
+    const scales = [1.0, 0.78, 0.82, 0.74, 0.76, 0.70]
+    const coloniesPerReef = [4, 3, 3, 3, 3, 3]
+
+    for (let r = 0; r < offsets.length; r++) {
+      const rng = makeRng(1337 + r * 9973)
+      const layout = buildReefLayout(coloniesPerReef[r], rng)
+      const { reef, colonies } = generateReefGeom(offsets[r], scales[r], layout, rng)
+      reefs.push(reef)
+      colonyCount += colonies
+    }
+  } else {
+    const rng = makeRng(424242)
+    const star = generateReefStarFrame(rng)
+    reefStarFrame = star.frame
+    reefStarTies = star.ties
+    const coral = generateCoralFromAnchors(star.anchors, rng)
+    reefs.push(coral.reef)
+    colonyCount += coral.colonies
+  }
+
+  const segmentsTotal = reefs.reduce((sum, r) => sum + r.geom.length / 8, 0)
+
   // Fish: 12 on 3 orbital rings (inner/mid/outer), orbit order.
   const fishCount = 12
   const fish = new Float32Array(fishCount * 8)
-  const ringR = [160, 220, 290]
+  const ringR = mode === 'reef-health' ? [240, 320, 420] : [160, 220, 290]
+  const fishRng = makeRng(mode === 'reef-health' ? 9001 : 9002)
   let fi = 0
   for (let ring = 0; ring < 3; ring++) {
     for (let k = 0; k < 4; k++) {
       const base = fi * 8
       const r = ringR[ring]
-      const orbitRadiusX = r * (0.9 + Math.random() * 0.25)
-      const orbitRadiusZ = r * (0.9 + Math.random() * 0.25)
-      const orbitY = 18 + ring * 12 + Math.random() * 16
-      const orbitPhase = Math.random() * TAU
-      const orbitSpeed = 0.3 + Math.random() * 0.6
-      const bodyLen = 18 + Math.random() * 10
-      const bodyH = 6 + Math.random() * 4
-      const colorIndex = Math.floor(Math.random() * 4)
+      const orbitRadiusX = r * (0.9 + fishRng() * 0.25)
+      const orbitRadiusZ = r * (0.9 + fishRng() * 0.25)
+      const orbitY = 18 + ring * 12 + fishRng() * 16
+      const orbitPhase = fishRng() * TAU
+      const orbitSpeed = 0.3 + fishRng() * 0.6
+      const bodyLen = 18 + fishRng() * 10
+      const bodyH = 6 + fishRng() * 4
+      const colorIndex = Math.floor(fishRng() * 4)
 
       fish[base + 0] = orbitRadiusX
       fish[base + 1] = orbitRadiusZ
@@ -317,8 +560,6 @@ function generateScene(w: number, h: number): Scene {
       fi++
     }
   }
-
-  const proj = new Float32Array(total * 5)
 
   const bloomCanvas = document.createElement('canvas')
   bloomCanvas.width = w
@@ -333,10 +574,41 @@ function generateScene(w: number, h: number): Scene {
     coralColor('reef-health', 3, 100),
   ]
 
+  // Vignette (subtle, keeps focus on the specimen).
+  const vignetteCanvas = document.createElement('canvas')
+  vignetteCanvas.width = w
+  vignetteCanvas.height = h
+  const vignetteCtx = vignetteCanvas.getContext('2d')
+  if (!vignetteCtx) throw new Error('2D context unavailable')
+  vignetteCtx.clearRect(0, 0, w, h)
+  const vg = vignetteCtx.createRadialGradient(w * 0.5, h * 0.52, Math.min(w, h) * 0.12, w * 0.5, h * 0.52, Math.min(w, h) * 0.62)
+  vg.addColorStop(0, 'rgba(0,0,0,0)')
+  vg.addColorStop(1, 'rgba(0,0,0,0.55)')
+  vignetteCtx.fillStyle = vg
+  vignetteCtx.fillRect(0, 0, w, h)
+
+  // Film grain (cached noise tile).
+  const grainCanvas = document.createElement('canvas')
+  grainCanvas.width = 256
+  grainCanvas.height = 256
+  const grainCtx = grainCanvas.getContext('2d')
+  if (!grainCtx) throw new Error('2D context unavailable')
+  const img = grainCtx.createImageData(256, 256)
+  const data = img.data
+  const grainRng = makeRng(7777)
+  for (let i = 0; i < data.length; i += 4) {
+    const n = Math.floor(90 + grainRng() * 110)
+    data[i + 0] = n
+    data[i + 1] = n
+    data[i + 2] = n
+    data[i + 3] = 18
+  }
+  grainCtx.putImageData(img, 0, 0)
+
   return {
-    geom,
-    proj,
-    groupStart,
+    reefs,
+    colonyCount,
+    segmentsTotal,
     fish,
     fishCount,
     colorCache,
@@ -344,6 +616,10 @@ function generateScene(w: number, h: number): Scene {
     bloomCanvas,
     bloomCtx,
     lastBloomHealthKey: -1,
+    vignetteCanvas,
+    grainCanvas,
+    reefStarFrame,
+    reefStarTies,
     frame: 0,
     w,
     h,
@@ -363,14 +639,23 @@ function lerpRgb(a: string, b: string, t: number): [number, number, number] {
   ]
 }
 
-function renderBloom(scene: Scene, health: number, cx: number, cy: number): void {
+function renderBloom(scene: Scene, health: number, cx: number, cy: number, mode: CanvasMode): void {
   const ctx = scene.bloomCtx
   const { w, h } = scene
   ctx.clearRect(0, 0, w, h)
 
-  const bloomT = health < 60 ? (60 - health) / 60 : 0
-  const [r, g, b] = lerpRgb('#081c12', '#1a1208', bloomT)
-  const str = 0.05 + 0.16 * (health / 100)
+  const health01 = Math.max(0, Math.min(1, health / 100))
+  const bloomT = mode === 'reef-health'
+    ? (health < 60 ? (60 - health) / 60 : 0)
+    : (1 - health01) * 0.35
+
+  const [r, g, b] = mode === 'reef-health'
+    ? lerpRgb('#081c12', '#1a1208', bloomT)
+    : lerpRgb('#03060a', '#071812', bloomT)
+
+  const str = mode === 'reef-health'
+    ? (0.05 + 0.16 * health01)
+    : (0.03 + 0.14 * health01)
 
   const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(w, h) * 0.55)
   grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${str})`)
@@ -379,12 +664,13 @@ function renderBloom(scene: Scene, health: number, cx: number, cy: number): void
   ctx.fillRect(0, 0, w, h)
 }
 
-function insertionSortByMidZ(geom: Float32Array, proj: Float32Array, start: number, end: number): void {
+function insertionSortByMidZ(geom: Float32Array, proj: Float32Array, tip: Float32Array, start: number, end: number): void {
   // Sort ascending by proj[midZ] within [start, end).
   for (let i = start + 1; i < end; i++) {
     const pi = i * 5
     const gi = i * 8
     const midZ = proj[pi + 4]
+    const tipV = tip[i]
 
     // Cache current rows
     const p0 = proj[pi + 0]
@@ -420,6 +706,7 @@ function insertionSortByMidZ(geom: Float32Array, proj: Float32Array, start: numb
       geom[gj + 8 + 5] = geom[gj + 5]
       geom[gj + 8 + 6] = geom[gj + 6]
       geom[gj + 8 + 7] = geom[gj + 7]
+      tip[j + 1] = tip[j]
       j--
     }
 
@@ -439,6 +726,7 @@ function insertionSortByMidZ(geom: Float32Array, proj: Float32Array, start: numb
     geom[dstG + 5] = g5
     geom[dstG + 6] = g6
     geom[dstG + 7] = g7
+    tip[j + 1] = tipV
   }
 }
 
@@ -577,11 +865,13 @@ function drawFrame(
   mode: CanvasMode,
   zoom: number,
   panX: number,
-  panY: number
+  panY: number,
+  value: number
 ): void {
-  const { w, h, geom, proj, groupStart } = scene
+  const { w, h, reefs } = scene
   const cx   = w / 2
-  const cy   = h * 0.50
+  // Slightly low camera center so the specimen reads taller / more monumental (ARBORIST framing).
+  const cy   = h * 0.54
   const ox = cx + panX
   const oy = cy + panY
   const rotY = (t / ROT_PERIOD) * TAU
@@ -602,7 +892,7 @@ function drawFrame(
     scene.lastHealthKey = healthKey
   }
   if (healthKey !== scene.lastBloomHealthKey) {
-    renderBloom(scene, health, cx, cy)
+    renderBloom(scene, health, cx, cy, mode)
     scene.lastBloomHealthKey = healthKey
   }
   ctx.drawImage(scene.bloomCanvas, 0, 0)
@@ -610,216 +900,268 @@ function drawFrame(
   const c = Math.cos(rotY)
   const s = Math.sin(rotY)
 
-  // Branch thinning (tissue loss) as health declines.
+  const health01 = Math.max(0, Math.min(1, health / 100))
+  const stressBase01 = Math.max(0, Math.min(1, (100 - health) / 100))
+
+  // Storytelling controls:
+  // - Reef Health: multiple reefs early, fewer survivors later; tips die back and branches shrink under stress.
+  // - Reef Star Growth: structure reveals outward as the coral grows.
+  let reefVisibleCount = 1
+  let stress01 = stressBase01
+  let keepTip01 = 1
+  let shrinkBase = 0
+
+  if (mode === 'reef-health') {
+    const year = value
+    reefVisibleCount =
+      year < 1998 ? 6 :
+        year < 2010 ? 5 :
+          year < 2014 ? 4 :
+            year < 2016 ? 3 :
+              year < 2024 ? 2 : 1
+    stress01 = stressBase01
+    keepTip01 = Math.max(0.04, Math.min(1, 1 - 0.92 * Math.pow(stress01, 0.9)))
+    shrinkBase = 0.58 * Math.pow(stress01, 1.15)
+  } else {
+    reefVisibleCount = 1
+    keepTip01 = Math.max(0.08, Math.min(1, 0.08 + 0.92 * Math.pow(health01, 1.05)))
+    shrinkBase = 0
+  }
+
+  // Branch thickness changes (tissue loss vs regrowth).
   const thicknessMult = mode === 'reef-star-growth'
-    ? (0.22 + 0.98 * (health / 100))
-    : (0.5 + 0.5 * (health / 100))
-
-  // Growth mode: reveal more branch structure over time (density increases with growth).
-  const visibleFrac = mode === 'reef-star-growth'
-    ? Math.max(0.08, Math.min(1, 0.08 + 0.92 * Math.pow(health / 100, 1.25)))
-    : 1
-
-  // Rotate + project (zero allocations).
-  let th0 = 0, th1 = 0, th2 = 0, th3 = 0
-  const count0 = groupStart[1] - groupStart[0]
-  const count1 = groupStart[2] - groupStart[1]
-  const count2 = groupStart[3] - groupStart[2]
-  const count3 = groupStart[4] - groupStart[3]
-
-  const end0 = groupStart[0] + Math.max(1, Math.floor(count0 * visibleFrac))
-  const end1 = groupStart[1] + Math.max(1, Math.floor(count1 * visibleFrac))
-  const end2 = groupStart[2] + Math.max(1, Math.floor(count2 * visibleFrac))
-  const end3 = groupStart[3] + Math.max(1, Math.floor(count3 * visibleFrac))
-  const vEnd0 = Math.min(groupStart[1], end0)
-  const vEnd1 = Math.min(groupStart[2], end1)
-  const vEnd2 = Math.min(groupStart[3], end2)
-  const vEnd3 = Math.min(groupStart[4], end3)
-
-  for (let i = groupStart[0]; i < vEnd0; i++) {
-    const gi = i * 8
-    const pi = i * 5
-    const p1x = geom[gi + 0], p1y = geom[gi + 1], p1z = geom[gi + 2]
-    const p2x = geom[gi + 3], p2y = geom[gi + 4], p2z = geom[gi + 5]
-    const tBase = geom[gi + 6]
-
-    const rp1x = p1x * c + p1z * s
-    const rp1z = -p1x * s + p1z * c
-    const rp2x = p2x * c + p2z * s
-    const rp2z = -p2x * s + p2z * c
-    const midZ = (rp1z + rp2z) * 0.5
-
-    const z1 = rp1z + FOV
-    const z2 = rp2z + FOV
-    const s1 = z1 > 1 ? FOV / z1 : 0.002
-    const s2 = z2 > 1 ? FOV / z2 : 0.002
-    const sAvg = (s1 + s2) * 0.5
-
-    proj[pi + 0] = ox + rp1x * s1 * zoom
-    proj[pi + 1] = oy - p1y * s1 * zoom
-    proj[pi + 2] = ox + rp2x * s2 * zoom
-    proj[pi + 3] = oy - p2y * s2 * zoom
-    proj[pi + 4] = midZ
-
-    th0 += tBase * sAvg
-  }
-
-  for (let i = groupStart[1]; i < vEnd1; i++) {
-    const gi = i * 8
-    const pi = i * 5
-    const p1x = geom[gi + 0], p1y = geom[gi + 1], p1z = geom[gi + 2]
-    const p2x = geom[gi + 3], p2y = geom[gi + 4], p2z = geom[gi + 5]
-    const tBase = geom[gi + 6]
-
-    const rp1x = p1x * c + p1z * s
-    const rp1z = -p1x * s + p1z * c
-    const rp2x = p2x * c + p2z * s
-    const rp2z = -p2x * s + p2z * c
-    const midZ = (rp1z + rp2z) * 0.5
-
-    const z1 = rp1z + FOV
-    const z2 = rp2z + FOV
-    const s1 = z1 > 1 ? FOV / z1 : 0.002
-    const s2 = z2 > 1 ? FOV / z2 : 0.002
-    const sAvg = (s1 + s2) * 0.5
-
-    proj[pi + 0] = ox + rp1x * s1 * zoom
-    proj[pi + 1] = oy - p1y * s1 * zoom
-    proj[pi + 2] = ox + rp2x * s2 * zoom
-    proj[pi + 3] = oy - p2y * s2 * zoom
-    proj[pi + 4] = midZ
-
-    th1 += tBase * sAvg
-  }
-
-  for (let i = groupStart[2]; i < vEnd2; i++) {
-    const gi = i * 8
-    const pi = i * 5
-    const p1x = geom[gi + 0], p1y = geom[gi + 1], p1z = geom[gi + 2]
-    const p2x = geom[gi + 3], p2y = geom[gi + 4], p2z = geom[gi + 5]
-    const tBase = geom[gi + 6]
-
-    const rp1x = p1x * c + p1z * s
-    const rp1z = -p1x * s + p1z * c
-    const rp2x = p2x * c + p2z * s
-    const rp2z = -p2x * s + p2z * c
-    const midZ = (rp1z + rp2z) * 0.5
-
-    const z1 = rp1z + FOV
-    const z2 = rp2z + FOV
-    const s1 = z1 > 1 ? FOV / z1 : 0.002
-    const s2 = z2 > 1 ? FOV / z2 : 0.002
-    const sAvg = (s1 + s2) * 0.5
-
-    proj[pi + 0] = ox + rp1x * s1 * zoom
-    proj[pi + 1] = oy - p1y * s1 * zoom
-    proj[pi + 2] = ox + rp2x * s2 * zoom
-    proj[pi + 3] = oy - p2y * s2 * zoom
-    proj[pi + 4] = midZ
-
-    th2 += tBase * sAvg
-  }
-
-  for (let i = groupStart[3]; i < vEnd3; i++) {
-    const gi = i * 8
-    const pi = i * 5
-    const p1x = geom[gi + 0], p1y = geom[gi + 1], p1z = geom[gi + 2]
-    const p2x = geom[gi + 3], p2y = geom[gi + 4], p2z = geom[gi + 5]
-    const tBase = geom[gi + 6]
-
-    const rp1x = p1x * c + p1z * s
-    const rp1z = -p1x * s + p1z * c
-    const rp2x = p2x * c + p2z * s
-    const rp2z = -p2x * s + p2z * c
-    const midZ = (rp1z + rp2z) * 0.5
-
-    const z1 = rp1z + FOV
-    const z2 = rp2z + FOV
-    const s1 = z1 > 1 ? FOV / z1 : 0.002
-    const s2 = z2 > 1 ? FOV / z2 : 0.002
-    const sAvg = (s1 + s2) * 0.5
-
-    proj[pi + 0] = ox + rp1x * s1 * zoom
-    proj[pi + 1] = oy - p1y * s1 * zoom
-    proj[pi + 2] = ox + rp2x * s2 * zoom
-    proj[pi + 3] = oy - p2y * s2 * zoom
-    proj[pi + 4] = midZ
-
-    th3 += tBase * sAvg
-  }
-
-  const vCount0 = vEnd0 - groupStart[0]
-  const vCount1 = vEnd1 - groupStart[1]
-  const vCount2 = vEnd2 - groupStart[2]
-  const vCount3 = vEnd3 - groupStart[3]
-
-  const avgTh0 = vCount0 > 0 ? (th0 / vCount0) * thicknessMult : 1
-  const avgTh1 = vCount1 > 0 ? (th1 / vCount1) * thicknessMult : 1
-  const avgTh2 = vCount2 > 0 ? (th2 / vCount2) * thicknessMult : 1
-  const avgTh3 = vCount3 > 0 ? (th3 / vCount3) * thicknessMult : 1
-
-  // Depth sort (back → front) within each color group every 3rd frame.
-  if (scene.frame % 3 === 0) {
-    insertionSortByMidZ(geom, proj, groupStart[0], vEnd0)
-    insertionSortByMidZ(geom, proj, groupStart[1], vEnd1)
-    insertionSortByMidZ(geom, proj, groupStart[2], vEnd2)
-    insertionSortByMidZ(geom, proj, groupStart[3], vEnd3)
-  }
+    ? (0.18 + 1.05 * health01)
+    : (0.22 + 0.92 * (1 - stress01))
 
   const coralAlpha = 0.92
-  const glowT = Math.max(0, Math.min(1, (health - 42) / 58))
-  const glowAlpha = glowT * 0.22
+  const glowT = mode === 'reef-star-growth'
+    ? Math.pow(health01, 1.2)
+    : Math.max(0, Math.min(1, (health - 74) / 26))
+  const glowAlpha = glowT * 0.20
 
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
 
-  // 4-batch draw (one path per color group). Glow uses filter blur (no shadowBlur in hot loop).
-  for (let group = 0; group < 4; group++) {
-    const start = groupStart[group]
-    const end = group === 0 ? vEnd0 : group === 1 ? vEnd1 : group === 2 ? vEnd2 : vEnd3
+  // Reef Star frame (growth mode): visible at Year 0, gradually engulfed by coral by Year 4.
+  if (mode === 'reef-star-growth' && scene.reefStarFrame) {
+    const frame = scene.reefStarFrame
+    const ties = scene.reefStarTies
+    const segCount = frame.geom.length / 7
 
-    ctx.beginPath()
-    for (let i = start; i < end; i++) {
-      const p = i * 5
-      ctx.moveTo(proj[p + 0], proj[p + 1])
-      ctx.lineTo(proj[p + 2], proj[p + 3])
-    }
+    const frameAlpha = Math.max(0, Math.min(0.9, 0.9 * Math.pow(1 - health01, 0.9)))
+    if (frameAlpha > 0.002) {
+      for (let i = 0; i < segCount; i++) {
+        const gi = i * 7
+        const pi = i * 5
+        const p1x = frame.geom[gi + 0], p1y = frame.geom[gi + 1], p1z = frame.geom[gi + 2]
+        const p2x = frame.geom[gi + 3], p2y = frame.geom[gi + 4], p2z = frame.geom[gi + 5]
 
-    const lineW = Math.max(
-      0.4,
-      group === 0 ? avgTh0 : group === 1 ? avgTh1 : group === 2 ? avgTh2 : avgTh3
-    )
+        const rp1x = p1x * c + p1z * s
+        const rp1z = -p1x * s + p1z * c
+        const rp2x = p2x * c + p2z * s
+        const rp2z = -p2x * s + p2z * c
+        const midZ = (rp1z + rp2z) * 0.5
 
-    if (glowAlpha > 0.002) {
+        const z1 = rp1z + FOV
+        const z2 = rp2z + FOV
+        const s1 = z1 > 1 ? FOV / z1 : 0.002
+        const s2 = z2 > 1 ? FOV / z2 : 0.002
+
+        frame.proj[pi + 0] = ox + rp1x * s1 * zoom
+        frame.proj[pi + 1] = oy - p1y * s1 * zoom
+        frame.proj[pi + 2] = ox + rp2x * s2 * zoom
+        frame.proj[pi + 3] = oy - p2y * s2 * zoom
+        frame.proj[pi + 4] = midZ
+      }
+
+      ctx.beginPath()
+      for (let i = 0; i < segCount; i++) {
+        const p = i * 5
+        ctx.moveTo(frame.proj[p + 0], frame.proj[p + 1])
+        ctx.lineTo(frame.proj[p + 2], frame.proj[p + 3])
+      }
+
+      const lw = Math.max(0.9, 1.8 * zoom)
       ctx.globalCompositeOperation = 'lighter'
-      ctx.filter = 'blur(8px)'
-      ctx.globalAlpha = glowAlpha
-      ctx.strokeStyle = HEALTHY_COLORS[group]
-      ctx.lineWidth = lineW * 2.2
+      ctx.filter = 'blur(6px)'
+      ctx.globalAlpha = frameAlpha * 0.25
+      ctx.strokeStyle = '#b8c0cc'
+      ctx.lineWidth = lw * 2.2
       ctx.stroke()
+
       ctx.filter = 'none'
       ctx.globalCompositeOperation = 'source-over'
+      ctx.globalAlpha = frameAlpha
+      ctx.strokeStyle = '#7f8896'
+      ctx.lineWidth = lw
+      ctx.stroke()
+
+      if (ties) {
+        const tieSegCount = ties.geom.length / 7
+        for (let i = 0; i < tieSegCount; i++) {
+          const gi = i * 7
+          const pi = i * 5
+          const p1x = ties.geom[gi + 0], p1y = ties.geom[gi + 1], p1z = ties.geom[gi + 2]
+          const p2x = ties.geom[gi + 3], p2y = ties.geom[gi + 4], p2z = ties.geom[gi + 5]
+
+          const rp1x = p1x * c + p1z * s
+          const rp1z = -p1x * s + p1z * c
+          const rp2x = p2x * c + p2z * s
+          const rp2z = -p2x * s + p2z * c
+          const midZ = (rp1z + rp2z) * 0.5
+
+          const z1 = rp1z + FOV
+          const z2 = rp2z + FOV
+          const s1 = z1 > 1 ? FOV / z1 : 0.002
+          const s2 = z2 > 1 ? FOV / z2 : 0.002
+
+          ties.proj[pi + 0] = ox + rp1x * s1 * zoom
+          ties.proj[pi + 1] = oy - p1y * s1 * zoom
+          ties.proj[pi + 2] = ox + rp2x * s2 * zoom
+          ties.proj[pi + 3] = oy - p2y * s2 * zoom
+          ties.proj[pi + 4] = midZ
+        }
+
+        ctx.beginPath()
+        for (let i = 0; i < tieSegCount; i++) {
+          const p = i * 5
+          ctx.moveTo(ties.proj[p + 0], ties.proj[p + 1])
+          ctx.lineTo(ties.proj[p + 2], ties.proj[p + 3])
+        }
+
+        ctx.globalAlpha = frameAlpha * 0.85
+        ctx.strokeStyle = '#cda15f'
+        ctx.lineWidth = Math.max(0.6, 1.05 * zoom)
+        ctx.stroke()
+      }
     }
 
-    ctx.globalAlpha = coralAlpha
-    ctx.strokeStyle = scene.colorCache[group]
-    ctx.lineWidth = lineW
-    ctx.stroke()
+    ctx.globalAlpha = 1
+    ctx.globalCompositeOperation = 'source-over'
+    ctx.filter = 'none'
+  }
+
+  const reefsToDraw = Math.max(0, Math.min(reefs.length, reefVisibleCount))
+  for (let reefIndex = 0; reefIndex < reefsToDraw; reefIndex++) {
+    const reef = reefs[reefIndex]
+    const { geom, proj, groupStart, tip } = reef
+    const reefFade = mode === 'reef-health' ? Math.max(0.55, 1 - reefIndex * 0.10) : 1
+
+    let th0 = 0, th1 = 0, th2 = 0, th3 = 0
+    let n0 = 0, n1 = 0, n2 = 0, n3 = 0
+
+    // Rotate + project (zero allocations).
+    for (let group = 0; group < 4; group++) {
+      const start = groupStart[group]
+      const end = groupStart[group + 1]
+      for (let i = start; i < end; i++) {
+        const tip01 = tip[i]
+        const pi = i * 5
+        if (tip01 > keepTip01) {
+          proj[pi + 4] = -1e9
+          continue
+        }
+
+        const gi = i * 8
+        const p1x = geom[gi + 0], p1y = geom[gi + 1], p1z = geom[gi + 2]
+        const p2x = geom[gi + 3], p2y = geom[gi + 4], p2z = geom[gi + 5]
+        const tBase = geom[gi + 6]
+
+        const rp1x = p1x * c + p1z * s
+        const rp1z = -p1x * s + p1z * c
+        const rp2x0 = p2x * c + p2z * s
+        const rp2z0 = -p2x * s + p2z * c
+
+        const shrink = shrinkBase > 0 ? (1 - shrinkBase * tip01) : 1
+        const rp2x = rp1x + (rp2x0 - rp1x) * shrink
+        const rp2z = rp1z + (rp2z0 - rp1z) * shrink
+        const rp2y = p1y + (p2y - p1y) * shrink
+
+        const midZ = (rp1z + rp2z) * 0.5
+
+        const z1 = rp1z + FOV
+        const z2 = rp2z + FOV
+        const s1 = z1 > 1 ? FOV / z1 : 0.002
+        const s2 = z2 > 1 ? FOV / z2 : 0.002
+        const sAvg = (s1 + s2) * 0.5
+
+        proj[pi + 0] = ox + rp1x * s1 * zoom
+        proj[pi + 1] = oy - p1y * s1 * zoom
+        proj[pi + 2] = ox + rp2x * s2 * zoom
+        proj[pi + 3] = oy - rp2y * s2 * zoom
+        proj[pi + 4] = midZ
+
+        if (group === 0) { th0 += tBase * sAvg; n0++ }
+        else if (group === 1) { th1 += tBase * sAvg; n1++ }
+        else if (group === 2) { th2 += tBase * sAvg; n2++ }
+        else { th3 += tBase * sAvg; n3++ }
+      }
+    }
+
+    const avgTh0 = n0 > 0 ? (th0 / n0) * thicknessMult : 1
+    const avgTh1 = n1 > 0 ? (th1 / n1) * thicknessMult : 1
+    const avgTh2 = n2 > 0 ? (th2 / n2) * thicknessMult : 1
+    const avgTh3 = n3 > 0 ? (th3 / n3) * thicknessMult : 1
+
+    // Depth sort (back → front) within each color group every 3rd frame.
+    if (scene.frame % 3 === 0) {
+      insertionSortByMidZ(geom, proj, tip, groupStart[0], groupStart[1])
+      insertionSortByMidZ(geom, proj, tip, groupStart[1], groupStart[2])
+      insertionSortByMidZ(geom, proj, tip, groupStart[2], groupStart[3])
+      insertionSortByMidZ(geom, proj, tip, groupStart[3], groupStart[4])
+    }
+
+    // 4-batch draw (one path per color group). Glow uses filter blur (no shadowBlur in hot loop).
+    for (let group = 0; group < 4; group++) {
+      const start = groupStart[group]
+      const end = groupStart[group + 1]
+
+      ctx.beginPath()
+      for (let i = start; i < end; i++) {
+        if (tip[i] > keepTip01) continue
+        const p = i * 5
+        if (proj[p + 4] <= -1e8) continue
+        ctx.moveTo(proj[p + 0], proj[p + 1])
+        ctx.lineTo(proj[p + 2], proj[p + 3])
+      }
+
+      const lineW = Math.max(
+        0.35,
+        group === 0 ? avgTh0 : group === 1 ? avgTh1 : group === 2 ? avgTh2 : avgTh3
+      )
+
+      if (glowAlpha > 0.002) {
+        ctx.globalCompositeOperation = 'lighter'
+        ctx.filter = 'blur(8px)'
+        ctx.globalAlpha = glowAlpha * reefFade
+        ctx.strokeStyle = HEALTHY_COLORS[group]
+        ctx.lineWidth = lineW * 2.2
+        ctx.stroke()
+        ctx.filter = 'none'
+        ctx.globalCompositeOperation = 'source-over'
+      }
+
+      ctx.globalAlpha = coralAlpha * reefFade
+      ctx.strokeStyle = scene.colorCache[group]
+      ctx.lineWidth = lineW
+      ctx.stroke()
+    }
   }
 
   // Fish (drawn after coral; orbit order, no depth-sort per fish).
   const fish = scene.fish
   const maxFish = scene.fishCount
-  const minFish = 2
-  // Tie population decline to bleaching curve: once the reef is fully bleached (~50 health),
-  // only a couple fish remain.
-  const bleachT = Math.max(0, Math.min(1, (100 - health) / 50))
-  const target = maxFish - (maxFish - minFish) * bleachT
+  const minFish = mode === 'reef-star-growth' ? 1 : 2
+  const target = mode === 'reef-star-growth'
+    ? (minFish + (maxFish - minFish) * Math.pow(health01, 1.35))
+    : (maxFish - (maxFish - minFish) * Math.max(0, Math.min(1, (100 - health) / 50)))
   const clampedTarget = Math.max(minFish, Math.min(maxFish, target))
   const fullCount = Math.floor(clampedTarget)
   const fade = clampedTarget - fullCount
   const fadeIndex = fade > 0.001 && fullCount < maxFish ? fullCount : -1
-  const fishBaseAlpha = 0.25 + 0.75 * (health / 100)
+  const fishBaseAlpha = mode === 'reef-star-growth'
+    ? (0.18 + 0.82 * health01)
+    : (0.18 + 0.82 * (1 - stress01))
 
   // Bodies: batch by color for fully-visible fish.
   for (let group = 0; group < 4; group++) {
@@ -861,6 +1203,16 @@ function drawFrame(
   ctx.globalAlpha = fishBaseAlpha
   ctx.fillStyle = 'rgba(0,0,0,0.85)'
   ctx.fill()
+
+  // Subtle post overlays (ARBORIST: felt, not seen).
+  ctx.globalCompositeOperation = 'source-over'
+  ctx.globalAlpha = 1
+  ctx.drawImage(scene.vignetteCanvas, 0, 0)
+  ctx.globalAlpha = mode === 'reef-star-growth' ? 0.05 : 0.06
+  ctx.globalCompositeOperation = 'overlay'
+  ctx.drawImage(scene.grainCanvas, 0, 0, w, h)
+  ctx.globalCompositeOperation = 'source-over'
+  ctx.globalAlpha = 1
 }
 
 // ─── Stat row sub-component ───────────────────────────────────────────────────
@@ -895,6 +1247,7 @@ export default function CoralReefCanvas({
   const rafRef      = useRef<number>(0)
   const startRef    = useRef<number>(0)
   const segCountRef = useRef<number>(0)
+  const colonyCountRef = useRef<number>(0)
 
   // View transform refs (no React state updates per-frame / per-pointermove).
   const zoomRef = useRef(1)
@@ -937,8 +1290,9 @@ export default function CoralReefCanvas({
       canvas.height       = 560 * dpr
       canvas.style.width  = cw + 'px'
       canvas.style.height = '560px'
-      sceneRef.current    = generateScene(canvas.width, canvas.height)
-      segCountRef.current = sceneRef.current.geom.length / 8
+      sceneRef.current    = generateScene(canvas.width, canvas.height, mode)
+      segCountRef.current = sceneRef.current.segmentsTotal
+      colonyCountRef.current = sceneRef.current.colonyCount
       clampView()
     }
 
@@ -948,9 +1302,9 @@ export default function CoralReefCanvas({
       if (!ctx || !sceneRef.current) return
       const t      = (now - startRef.current) / 1000
       const health = isReefHealth
-        ? reefHealthIndexAtYear(valueRef.current).health
+        ? reefHealthVisualAtYear(valueRef.current).health
         : growthHealthAtAge(valueRef.current)
-      drawFrame(ctx, sceneRef.current, t, health, mode, zoomRef.current, panXRef.current, panYRef.current)
+      drawFrame(ctx, sceneRef.current, t, health, mode, zoomRef.current, panXRef.current, panYRef.current, valueRef.current)
     }
 
     function onWheel(e: WheelEvent) {
@@ -1041,7 +1395,7 @@ export default function CoralReefCanvas({
   }, [isReefHealth, mode])
 
   const healthSample = isReefHealth
-    ? reefHealthIndexAtYear(selectedValue)
+    ? reefHealthVisualAtYear(selectedValue)
     : { health: growthHealthAtAge(selectedValue) }
   const health = healthSample.health
 
@@ -1052,10 +1406,10 @@ export default function CoralReefCanvas({
       // - Inspired by results showing rapid reef growth / functional (carbonate budget) recovery within ~4 years in a
       //   large-scale Indonesia restoration program: Lange ID et al. (2024) Current Biology.
       //   DOI: 10.1016/j.cub.2024.02.009
-      selectedValue === 0 ? 'INSTALL · RUBBLE FIELD'
-        : selectedValue === 1 ? 'STABILIZATION'
-          : selectedValue === 2 ? 'EARLY REGROWTH'
-            : selectedValue === 3 ? 'STRUCTURE BUILDS'
+      selectedValue === 0 ? 'REEF STAR INSTALL'
+        : selectedValue === 1 ? 'EARLY ENCRUSTATION'
+          : selectedValue === 2 ? 'BRANCHING THICKET'
+            : selectedValue === 3 ? 'STAR ENGULFS'
               : selectedValue === 4 ? 'FUNCTIONAL RECOVERY'
                 : null
     )
@@ -1100,7 +1454,7 @@ export default function CoralReefCanvas({
         {isReefHealth && selectedValue > LAST_GCRMN_COVER_YEAR && healthSample.noaaAsOfDate && (
           <StatRow label="NOAA" value={healthSample.noaaAsOfDate} />
         )}
-        <StatRow label="COLONIES" value={String(COLONY_LAYOUT.length)} />
+        <StatRow label="COLONIES" value={String(colonyCountRef.current)} />
         <StatRow label="SEGMENTS" value={String(segCountRef.current)} />
         {activeEvent && <StatRow label="STATUS" value={isReefHealth ? 'BLEACHING' : 'GROWTH'} warn={isWarn} />}
       </aside>
