@@ -50,10 +50,10 @@ const STAR_TICKS = [0, 12, 24, 36, 48, 60, 72] as const
 
 function growthHealthAtAge(ageMonths: number): number {
   // 0 → 72 months since installation.
-  // Use a gentle ease so 2-month steps still feel gradual (no popping).
+  // Story arc: slow start, then stronger late build-up (user-requested).
   const a = Math.max(STAR_FIRST, Math.min(STAR_LAST, ageMonths))
   const t = STAR_SPAN === 0 ? 0 : (a - STAR_FIRST) / STAR_SPAN
-  return 100 * Math.pow(t, 0.85)
+  return 100 * Math.pow(t, 1.45)
 }
 
 function reefHealthIndexAtYear(year: number): { health: number; noaaAsOfDate?: string } {
@@ -87,8 +87,8 @@ const TAU         = Math.PI * 2
 const BOMMIE_R    = 115   // hemisphere radius (world units)
 const BRANCH_LEN  = 64    // initial trunk length per colony (world units)
 const FOV         = 600   // perspective focal length
-const STATIC_ROT_Y_HEALTH = 0.04
-const STATIC_ROT_Y_STAR = 0.48
+const STATIC_ROT_Y_HEALTH = 0
+const STATIC_ROT_Y_STAR = 0.56
 
 const HEALTHY_COLORS = ['#ff6b9e', '#ff8c42', '#00c9a7', '#c77dff'] as const
 const BLEACH_COLOR   = '#ddd8cc'
@@ -147,18 +147,18 @@ function lerpColor(a: string, b: string, t: number): string {
   return `rgb(${Math.round(r1 + (r2 - r1) * tc)},${Math.round(g1 + (g2 - g1) * tc)},${Math.round(b1 + (b2 - b1) * tc)})`
 }
 const STAR_FRAGMENT_COLOR = '#7a5f3f'
-const DEAD_ALGAE_COLOR = '#5a564c'
+const WEAK_CORAL_COLOR = '#c9c2b8'
 function coralColor(mode: CanvasMode, colorIndex: number, health: number): string {
   if (mode === 'reef-star-growth') {
     const t = Math.max(0, Math.min(1, health / 100))
     return lerpColor(STAR_FRAGMENT_COLOR, HEALTHY_COLORS[colorIndex % 4], Math.pow(t, 0.85))
   }
-  // Reef health: bleaching should read as *pale/white but still visible* (not “dark/invisible”).
-  // We keep value (brightness) high while draining saturation into bone-white, then add algae staining later.
-  const bleachT = Math.max(0, Math.min(1, (92 - health) / 55))
-  const algaeT = Math.max(0, Math.min(1, (48 - health) / 48))
+  // Reef health must communicate: vibrant (alive) -> pale white (bleached) -> weaker/fading structure.
+  // Avoid black corals; color loss carries the storytelling signal.
+  const bleachT = Math.max(0, Math.min(1, (96 - health) / 52))
+  const weakenT = Math.max(0, Math.min(1, (42 - health) / 42))
   const bleached = lerpColor(HEALTHY_COLORS[colorIndex % 4], BLEACH_COLOR, bleachT)
-  return lerpColor(bleached, DEAD_ALGAE_COLOR, algaeT * 0.85)
+  return lerpColor(bleached, WEAK_CORAL_COLOR, weakenT * 0.45)
 }
 
 // ─── Scene ────────────────────────────────────────────────────────────────────
@@ -602,40 +602,62 @@ function generateScene(w: number, h: number, mode: CanvasMode): Scene {
   let reefStarFragments: LineGeom | undefined
 
   if (mode === 'reef-health') {
-    // Reef field: many separate bommies/colonies early; collapses to a core survivor by TODAY.
-    // Keep geometry budgets modest (typed arrays + batched strokes stay fast).
+    // Reef landscape: place bommies along one shared depth plane (same Z) so it reads like a scene,
+    // not objects popping toward the viewer.
     const rng = makeRng(1337)
+    const zPlane = 24
+    const maxY = 10
+    const minY = -18
 
     const placements: Array<{ offset: Vec3; scale: number; colonies: number; start?: number; span?: number; fade?: number }> = []
-    placements.push({ offset: { x: 0, y: 0, z: 0 }, scale: 1.25, colonies: 7, start: 9999, span: 1, fade: 1 })
+    const count = 19
+    const halfWidth = 980
+    for (let i = 0; i < count; i++) {
+      const t = count <= 1 ? 0 : i / (count - 1)
+      const xBase = -halfWidth + t * (halfWidth * 2)
+      const x = xBase + (rng() - 0.5) * 48
+      const yRaw = (rng() - 0.5) * 26
+      const y = Math.max(minY, Math.min(maxY, yRaw))
+      const d = Math.min(1, Math.abs(x) / halfWidth)
 
-    const rings = [
-      { count: 7, r: 360, y: 0, scale: 1.05, colonies: 6 },
-      { count: 11, r: 560, y: 0, scale: 0.92, colonies: 5 },
-    ]
-    for (let ringIndex = 0; ringIndex < rings.length; ringIndex++) {
-      const ring = rings[ringIndex]
-      for (let i = 0; i < ring.count; i++) {
-        const a = (i / ring.count) * TAU + (rng() - 0.5) * 0.12
-        const jr = (rng() - 0.5) * 34
-        const ox = Math.cos(a) * (ring.r + jr)
-        const oz = Math.sin(a) * (ring.r + jr)
-        // Keep all bommies rooted on one common plane for a true landscape read.
-        const oy = ring.y
-        const dist = Math.sqrt(ox * ox + oz * oz)
-        const t = dist / 560
-        const start = t > 0.82 ? 1998 : t > 0.62 ? 2010 : 2014
-        const span = t > 0.82 ? 9.0 : t > 0.62 ? 6.5 : 5.0
-        const fade = t > 0.82 ? 0.72 : t > 0.62 ? 0.82 : 0.90
-        placements.push({
-          offset: { x: ox, y: oy, z: oz },
-          scale: ring.scale * (0.94 + rng() * 0.14),
-          colonies: ring.colonies + (rng() > 0.65 ? 1 : 0),
-          start,
-          span,
-          fade,
-        })
+      let start = 2024
+      let span = 3.0
+      let fade = 0.96
+      if (d > 0.86) {
+        start = 1998
+        span = 9.2
+        fade = 0.72
+      } else if (d > 0.66) {
+        start = 2010
+        span = 7.0
+        fade = 0.80
+      } else if (d > 0.44) {
+        start = 2014
+        span = 5.8
+        fade = 0.88
+      } else if (d > 0.24) {
+        start = 2016
+        span = 4.8
+        fade = 0.92
       }
+      // Slight randomness while keeping edge-first collapse dominant.
+      start += (rng() - 0.5) * 1.4
+      span *= 0.92 + rng() * 0.2
+
+      const centerBoost = 1 - d
+      const scale = (0.9 + centerBoost * 0.42) * (0.94 + rng() * 0.14)
+      const colonies = d < 0.34 ? 7 : d < 0.62 ? 6 : 5
+
+      // Keep one core survivor through TODAY.
+      const isCore = Math.abs(x) < 56
+      placements.push({
+        offset: { x, y, z: zPlane },
+        scale,
+        colonies: isCore ? 8 : colonies,
+        start: isCore ? 9999 : start,
+        span: isCore ? 1 : span,
+        fade: isCore ? 1 : fade,
+      })
     }
 
     for (let r = 0; r < placements.length; r++) {
@@ -1061,13 +1083,14 @@ function drawFrame(
     keepTip01 = Math.max(0.14, Math.min(1, 1 - 0.88 * Math.pow(stress01, 0.9)))
     shrinkBase = 0.58 * Math.pow(stress01, 1.15)
   } else {
-    keepTip01 = Math.max(0.08, Math.min(1, 0.08 + 0.92 * Math.pow(health01, 1.05)))
+    // Growth mode: slower start, stronger late expansion.
+    keepTip01 = Math.max(0.03, Math.min(1, 0.03 + 0.97 * Math.pow(health01, 1.45)))
     shrinkBase = 0
   }
 
   // Branch thickness changes (tissue loss vs regrowth).
   const thicknessMult = mode === 'reef-star-growth'
-    ? (0.18 + 1.05 * health01)
+    ? (0.08 + 1.55 * Math.pow(health01, 1.25))
     : (0.22 + 0.92 * (1 - stress01))
 
   const coralAlpha = 0.98
@@ -1440,7 +1463,7 @@ function drawFrame(
   const maxFish = scene.fishCount
   const minFish = mode === 'reef-star-growth' ? 1 : 2
   const target = mode === 'reef-star-growth'
-    ? (minFish + (maxFish - minFish) * Math.pow(health01, 1.35))
+    ? (minFish + (maxFish - minFish) * Math.pow(health01, 1.9))
     : (maxFish - (maxFish - minFish) * Math.max(0, Math.min(1, (100 - health) / 50)))
   const clampedTarget = Math.max(minFish, Math.min(maxFish, target))
   const fullCount = Math.floor(clampedTarget)
