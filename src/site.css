@@ -16,8 +16,8 @@
   --color-teal: #0f766e;
   --color-green: #2d6f35;
   --color-purple: #8a4b2a;
-  --font-sans: 'Manrope', 'Avenir Next', 'Helvetica Neue', sans-serif;
-  --font-display: 'Nunito', 'Manrope', sans-serif;
+  --font-sans: 'Atkinson Hyperlegible', 'Avenir Next', 'Helvetica Neue', sans-serif;
+  --font-display: 'Sora', 'Atkinson Hyperlegible', sans-serif;
   --font-serif: var(--font-display);
   --radius: 10px;
   --radius-lg: 12px;

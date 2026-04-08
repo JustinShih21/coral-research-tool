@@ -2427,102 +2427,142 @@ input, textarea {
 
 /* ═══════════════════════════════════════════════════════════════════
    Coral Reef Canvas Hero  (src/components/CoralReefCanvas.tsx)
-   3D forward-perspective reef viewer with user-controlled year scrubber.
+   ARBORIST-inspired: 3D bommie specimen in a black void.
    Full-bleed (breaks out of .main's 2rem side padding).
+   All UI text uses monospace + all-caps + amber accents.
    ═══════════════════════════════════════════════════════════════════ */
+
+/* Shared monospace stack used throughout this component */
+:root { --font-mono: 'Courier New', 'Andale Mono', Courier, monospace; }
 
 .coral-reef-hero {
   position: relative;
-  /* Break out of .main's 0 2rem padding to go full-bleed */
   margin: 0 -2rem 1.75rem;
-  background: #050e18;
+  background: #000;
   overflow: hidden;
 }
 
 .coral-reef-canvas {
   display: block;
   width: 100%;
-  /* Height is set imperatively by JS (600px logical); this is just a fallback */
-  height: 600px;
+  height: 560px; /* JS overrides this imperatively */
 }
 
-/* ── Title overlay — top-left corner of canvas ──────────────────── */
-.crc-title-overlay {
+/* ── Header — top-left ──────────────────────────────────────────── */
+.crc-header {
   position: absolute;
-  top: 1.5rem;
-  left: 2rem;
+  top: 1.25rem;
+  left: 1.75rem;
   pointer-events: none;
   user-select: none;
 }
-.crc-title-text {
-  margin: 0 0 0.3rem;
-  font-family: var(--font-serif);
-  font-size: 1.6rem;
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.92);
-  text-shadow: 0 2px 12px rgba(0,0,0,0.6);
-  line-height: 1.15;
+.crc-header-title {
+  margin: 0 0 0.25rem;
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.88);
+  line-height: 1;
 }
-.crc-subtitle-text {
+.crc-header-sub {
   margin: 0;
-  font-size: 13px;
-  color: rgba(180, 215, 240, 0.75);
-  text-shadow: 0 1px 6px rgba(0,0,0,0.5);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  color: rgba(200, 210, 200, 0.40);
+  line-height: 1.4;
 }
 
-/* ── Year scrubber — bottom of canvas ──────────────────────────── */
-.crc-scrubber {
+/* ── Stats panel — top-right ────────────────────────────────────── */
+.crc-stats {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  pointer-events: none;
+  user-select: none;
+}
+.crc-stat-row {
+  display: flex;
+  gap: 1.2rem;
+  justify-content: flex-end;
+  align-items: baseline;
+}
+.crc-stat-label {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.10em;
+  color: rgba(200, 210, 200, 0.35);
+  text-align: right;
+  min-width: 5.5ch;
+}
+.crc-stat-value {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: rgba(240, 240, 230, 0.80);
+  text-align: right;
+  min-width: 5ch;
+}
+.crc-stat-value--warn {
+  color: var(--color-gold);
+}
+
+/* ── Bottom controls ─────────────────────────────────────────────── */
+.crc-controls {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 0.85rem 2rem 1rem;
-  background: linear-gradient(to top, rgba(4, 12, 22, 0.88), rgba(4, 12, 22, 0));
+  padding: 0.65rem 1.75rem 0.85rem;
+  background: linear-gradient(to top, rgba(0,0,0,0.85) 60%, rgba(0,0,0,0));
 }
 
-.crc-scrubber-top {
+.crc-year-display {
   display: flex;
   align-items: baseline;
-  gap: 1rem;
-  margin-bottom: 0.5rem;
+  gap: 1.1rem;
+  margin-bottom: 0.45rem;
 }
 
-.crc-year {
-  font-family: var(--font-sans);
-  font-size: 2rem;
+.crc-year-num {
+  font-family: var(--font-mono);
+  font-size: 1.75rem;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.95);
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.92);
   line-height: 1;
-  letter-spacing: -0.02em;
   min-width: 4ch;
 }
 
-.crc-event {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 0.9rem;
-  color: rgba(255, 230, 160, 0.92);
+.crc-event-text {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.10em;
+  color: var(--color-gold);
+  opacity: 0.90;
 }
-.crc-event--empty {
-  color: rgba(160, 195, 220, 0.55);
-  font-style: normal;
-  font-family: var(--font-sans);
-  font-size: 0.8rem;
+.crc-hint-text {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  color: rgba(200, 210, 200, 0.30);
 }
 
-/* Slider track + thumb */
+/* Slider */
 .crc-slider-wrap {
   position: relative;
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.3rem;
 }
-
 .crc-slider {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 3px;
-  background: rgba(255, 255, 255, 0.18);
-  border-radius: 2px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.15);
   outline: none;
   cursor: pointer;
   position: relative;
@@ -2531,58 +2571,58 @@ input, textarea {
 .crc-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 16px;
-  height: 16px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: #fff;
-  border: 2px solid rgba(0, 180, 160, 0.8);
-  box-shadow: 0 0 8px rgba(0, 180, 160, 0.6);
+  background: rgba(255, 255, 255, 0.90);
+  border: 1.5px solid rgba(200, 146, 42, 0.85);
+  box-shadow: 0 0 6px rgba(200, 146, 42, 0.55);
   cursor: pointer;
-  transition: transform 0.1s, box-shadow 0.1s;
+  transition: transform 0.12s, box-shadow 0.12s;
 }
 .crc-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.2);
-  box-shadow: 0 0 14px rgba(0, 200, 180, 0.8);
+  transform: scale(1.25);
+  box-shadow: 0 0 12px rgba(200, 146, 42, 0.8);
 }
 .crc-slider::-moz-range-thumb {
-  width: 16px; height: 16px;
+  width: 12px; height: 12px;
   border-radius: 50%;
-  background: #fff;
-  border: 2px solid rgba(0, 180, 160, 0.8);
+  background: rgba(255, 255, 255, 0.90);
+  border: 1.5px solid rgba(200, 146, 42, 0.85);
   cursor: pointer;
 }
 
-/* Event tick marks on the slider track */
+/* Event ticks */
 .crc-ticks {
   position: absolute;
   top: 50%;
-  left: 0;
-  right: 0;
+  left: 0; right: 0;
   transform: translateY(-50%);
   pointer-events: none;
 }
 .crc-tick {
   position: absolute;
-  width: 4px;
-  height: 10px;
-  background: rgba(255, 210, 100, 0.55);
-  border-radius: 2px;
+  width: 1px;
+  height: 8px;
+  background: rgba(200, 146, 42, 0.45);
   transform: translate(-50%, -50%);
   top: 50%;
-  transition: background 0.2s, height 0.2s;
+  transition: background 0.15s, height 0.15s;
 }
 .crc-tick--active {
-  background: rgba(255, 210, 100, 0.95);
-  height: 14px;
+  background: rgba(200, 146, 42, 1);
+  height: 12px;
+  width: 2px;
 }
 
-/* Start/end year labels */
+/* Year-range end labels */
 .crc-range-ends {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
-  color: rgba(160, 195, 220, 0.55);
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  color: rgba(200, 210, 200, 0.28);
   user-select: none;
 }
 
