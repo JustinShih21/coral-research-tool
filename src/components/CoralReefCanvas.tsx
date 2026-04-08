@@ -381,23 +381,26 @@ function generateReefStarFrame(rng: () => number): { frame: LineGeom; ties: Line
   // References (for shape/storytelling; exact dimensions are not required here):
   // - MARRS Reef Stars are modular hexagonal steel structures interlocked over rubble, with coral fragments attached.
   //   (See: GBR Biology summary / Reef Magic deployment notes) https://www.gbrbiology.com/2022/04/08/mars-and-coral-rubble-stabilisation/
-  const STAR_R_TOP = 122
-  const STAR_R_BOT = 108
-  const STAR_Y_TOP = -42
-  const STAR_Y_BOT = -62
-  const LEG_Y = -86
+  // Match the "low dome / cage" look seen in BuildingCoral's coating photos.
+  // Example photo: https://building-coral.transforms.svdcdn.com/production/assets/images/RVT_5910.jpeg (sand coating)
+  const BASE_R = 150
+  const MID_R = 108
+  const BASE_Y = -72
+  const MID_Y = -54
+  const APEX_Y = -34
+  const LEG_Y = -96
 
-  const vertsTop: Vec3[] = []
-  const vertsBot: Vec3[] = []
+  const vertsBase: Vec3[] = []
+  const vertsMid: Vec3[] = []
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * TAU
-    vertsTop.push({ x: Math.cos(a) * STAR_R_TOP, y: STAR_Y_TOP, z: Math.sin(a) * STAR_R_TOP })
-    // Slight twist so it reads as a 3D frame during rotation.
-    const b = a + 0.18
-    vertsBot.push({ x: Math.cos(b) * STAR_R_BOT, y: STAR_Y_BOT, z: Math.sin(b) * STAR_R_BOT })
+    const jx = (rng() - 0.5) * 6
+    const jz = (rng() - 0.5) * 6
+    vertsBase.push({ x: Math.cos(a) * BASE_R + jx, y: BASE_Y + (rng() - 0.5) * 3, z: Math.sin(a) * BASE_R + jz })
+    const b = a + 0.12
+    vertsMid.push({ x: Math.cos(b) * MID_R, y: MID_Y + (rng() - 0.5) * 2, z: Math.sin(b) * MID_R })
   }
-  const centerTop: Vec3 = { x: 0, y: STAR_Y_TOP, z: 0 }
-  const centerBot: Vec3 = { x: 0, y: STAR_Y_BOT, z: 0 }
+  const apex: Vec3 = { x: 0, y: APEX_Y, z: 0 }
 
   const segs: number[] = []
   const ties: number[] = []
@@ -423,42 +426,43 @@ function generateReefStarFrame(rng: () => number): { frame: LineGeom; ties: Line
     )
   }
 
-  // Top + bottom hex rings.
-  for (let i = 0; i < 6; i++) addSeg(vertsTop[i], vertsTop[(i + 1) % 6], 2.6)
-  for (let i = 0; i < 6; i++) addSeg(vertsBot[i], vertsBot[(i + 1) % 6], 2.1)
-
-  // Struts between rings (gives depth).
-  for (let i = 0; i < 6; i++) addSeg(vertsTop[i], vertsBot[i], 1.7)
-
-  // Spokes (top and bottom).
-  for (let i = 0; i < 6; i++) addSeg(vertsTop[i], centerTop, 2.1)
-  for (let i = 0; i < 6; i++) addSeg(vertsBot[i], centerBot, 1.7)
-
-  // Diagonals on top ring for "star" read.
-  for (let i = 0; i < 6; i++) addSeg(vertsTop[i], vertsTop[(i + 2) % 6], 1.6)
-
-  // Legs (suggests it sits above rubble; helps 3D read).
+  // Base ring.
+  for (let i = 0; i < 6; i++) addSeg(vertsBase[i], vertsBase[(i + 1) % 6], 2.5)
+  // Mid ring.
+  for (let i = 0; i < 6; i++) addSeg(vertsMid[i], vertsMid[(i + 1) % 6], 2.0)
+  // Struts from base to mid (triangulated cage).
   for (let i = 0; i < 6; i++) {
-    const v = vertsBot[i]
-    addSeg(v, { x: v.x * 0.92, y: LEG_Y, z: v.z * 0.92 }, 1.5)
+    addSeg(vertsBase[i], vertsMid[i], 1.7)
+    addSeg(vertsBase[(i + 1) % 6], vertsMid[i], 1.55)
+  }
+  // Struts from mid to apex.
+  for (let i = 0; i < 6; i++) addSeg(vertsMid[i], apex, 1.65)
+  // Cross braces on base (star-ish read).
+  for (let i = 0; i < 6; i++) addSeg(vertsBase[i], vertsBase[(i + 2) % 6], 1.35)
+  // Legs (keeps it elevated above rubble).
+  for (let i = 0; i < 6; i++) {
+    const v = vertsBase[i]
+    addSeg(v, { x: v.x * 0.86, y: LEG_Y, z: v.z * 0.86 }, 1.5)
   }
 
   // Attachment anchors: vertices + mid-spokes (where fragments would be tied).
   const anchors: Vec3[] = []
   for (let i = 0; i < 6; i++) {
-    const v = vertsTop[i]
-    anchors.push({ x: v.x, y: v.y + 3, z: v.z })
-    anchors.push({ x: v.x * 0.55, y: v.y + 2, z: v.z * 0.55 })
+    const vb = vertsBase[i]
+    const vm = vertsMid[i]
+    anchors.push({ x: vb.x * 0.92, y: vb.y + 2, z: vb.z * 0.92 })
+    anchors.push({ x: vm.x * 0.98, y: vm.y + 2, z: vm.z * 0.98 })
+    anchors.push({ x: vm.x * 0.55, y: vm.y + 1, z: vm.z * 0.55 })
 
     // Tie stroke tangent around the ring.
     const a = (i / 6) * TAU
     const tx = -Math.sin(a)
     const tz = Math.cos(a)
-    addTie({ x: v.x * 0.80, y: v.y, z: v.z * 0.80 }, { x: tx, y: 0, z: tz }, 1.4)
+    addTie({ x: vb.x * 0.78, y: vb.y, z: vb.z * 0.78 }, { x: tx, y: 0, z: tz }, 1.4)
 
     // Fragment stubs (look like strapped coral pieces at Month 0).
     addFragment(
-      { x: v.x * 0.92, y: v.y + 1, z: v.z * 0.92 },
+      { x: vb.x * 0.92, y: vb.y + 2, z: vb.z * 0.92 },
       v3.norm({ x: tx * 0.15, y: 1, z: tz * 0.15 }),
       2.2
     )
@@ -546,14 +550,15 @@ function generateScene(w: number, h: number, mode: CanvasMode): Scene {
     // A small reef field early, tapering down to a single survivor by TODAY.
     const offsets: Vec3[] = [
       { x: 0, y: 0, z: 0 },
-      { x: -220, y: -6, z: 110 },
-      { x: 220, y: 6, z: 80 },
-      { x: -140, y: 10, z: -190 },
-      { x: 150, y: -10, z: -160 },
-      { x: 0, y: 18, z: 240 },
+      { x: -300, y: -10, z: 150 },
+      { x: 300, y: 12, z: 120 },
+      { x: -190, y: 14, z: -260 },
+      { x: 210, y: -14, z: -240 },
+      { x: 0, y: 22, z: 330 },
     ]
-    const scales = [1.0, 0.78, 0.82, 0.74, 0.76, 0.70]
-    const coloniesPerReef = [4, 3, 3, 3, 3, 3]
+    // Larger scales + slightly more colonies to ensure the reef field fills the frame.
+    const scales = [1.25, 1.05, 1.08, 0.98, 1.0, 0.95]
+    const coloniesPerReef = [6, 4, 4, 4, 4, 4]
 
     for (let r = 0; r < offsets.length; r++) {
       const rng = makeRng(1337 + r * 9973)
@@ -696,11 +701,11 @@ function renderBloom(scene: Scene, health: number, cx: number, cy: number, mode:
     : (1 - health01) * 0.35
 
   const [r, g, b] = mode === 'reef-health'
-    ? lerpRgb('#081c12', '#1a1208', bloomT)
+    ? lerpRgb('#05151f', '#221308', bloomT)
     : lerpRgb('#03060a', '#071812', bloomT)
 
   const str = mode === 'reef-health'
-    ? (0.05 + 0.16 * health01)
+    ? (0.09 + 0.22 * health01)
     : (0.03 + 0.14 * health01)
 
   const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(w, h) * 0.55)
@@ -924,8 +929,8 @@ function drawFrame(
 
   scene.frame++
 
-  // Pure black background.
-  ctx.fillStyle = '#000'
+  // Void background (slightly lifted from pure black so structure is readable).
+  ctx.fillStyle = mode === 'reef-health' ? '#01040a' : '#000'
   ctx.fillRect(0, 0, w, h)
 
   // Cache health-driven styles (only changes while scrubbing the slider).
@@ -1257,8 +1262,8 @@ function drawFrame(
   const fade = clampedTarget - fullCount
   const fadeIndex = fade > 0.001 && fullCount < maxFish ? fullCount : -1
   const fishBaseAlpha = mode === 'reef-star-growth'
-    ? (0.18 + 0.82 * health01)
-    : (0.18 + 0.82 * (1 - stress01))
+    ? (0.16 + 0.84 * health01)
+    : (0.06 + 0.24 * (1 - stress01))
 
   // Bodies: batch by color for fully-visible fish.
   for (let group = 0; group < 4; group++) {
@@ -1303,10 +1308,10 @@ function drawFrame(
 
   // Subtle post overlays (ARBORIST: felt, not seen).
   ctx.globalCompositeOperation = 'source-over'
-  ctx.globalAlpha = 1
+  ctx.globalAlpha = mode === 'reef-health' ? 0.55 : 1
   ctx.drawImage(scene.vignetteCanvas, 0, 0)
-  ctx.globalAlpha = mode === 'reef-star-growth' ? 0.05 : 0.06
-  ctx.globalCompositeOperation = 'overlay'
+  ctx.globalAlpha = mode === 'reef-star-growth' ? 0.05 : 0.03
+  ctx.globalCompositeOperation = 'soft-light'
   ctx.drawImage(scene.grainCanvas, 0, 0, w, h)
   ctx.globalCompositeOperation = 'source-over'
   ctx.globalAlpha = 1
@@ -1345,6 +1350,8 @@ export default function CoralReefCanvas({
   const startRef    = useRef<number>(0)
   const segCountRef = useRef<number>(0)
   const colonyCountRef = useRef<number>(0)
+  const healthSmoothRef = useRef<number>(100)
+  const lastNowRef = useRef<number>(0)
 
   // View transform refs (no React state updates per-frame / per-pointermove).
   const zoomRef = useRef(1)
@@ -1355,6 +1362,7 @@ export default function CoralReefCanvas({
   useEffect(() => {
     setSelectedValue(maxValue)
     valueRef.current = maxValue
+    healthSmoothRef.current = isReefHealth ? reefHealthVisualAtYear(maxValue).health : growthHealthAtAge(maxValue)
   }, [maxValue])
 
   useEffect(() => { valueRef.current = selectedValue }, [selectedValue])
@@ -1366,6 +1374,11 @@ export default function CoralReefCanvas({
 
     canvas.style.cursor = 'grab'
     canvas.style.touchAction = 'none'
+
+    const defaultZoom = mode === 'reef-health' ? 1.45 : 1.12
+    zoomRef.current = defaultZoom
+    panXRef.current = 0
+    panYRef.current = mode === 'reef-health' ? 0 : 0
 
     function clampView() {
       const scene = sceneRef.current
@@ -1398,10 +1411,29 @@ export default function CoralReefCanvas({
       const ctx = canvas.getContext('2d')
       if (!ctx || !sceneRef.current) return
       const t      = (now - startRef.current) / 1000
-      const health = isReefHealth
+
+      const targetHealth = isReefHealth
         ? reefHealthVisualAtYear(valueRef.current).health
         : growthHealthAtAge(valueRef.current)
-      drawFrame(ctx, sceneRef.current, t, health, mode, zoomRef.current, panXRef.current, panYRef.current, valueRef.current)
+
+      // Smooth transitions so month-by-month changes feel gradual (no sudden pops).
+      const lastNow = lastNowRef.current || now
+      lastNowRef.current = now
+      const dt = Math.max(0, Math.min(0.05, (now - lastNow) / 1000))
+      const k = 1 - Math.pow(0.001, dt) // ~fast response, dt-correct
+      healthSmoothRef.current = healthSmoothRef.current + (targetHealth - healthSmoothRef.current) * k
+
+      drawFrame(
+        ctx,
+        sceneRef.current,
+        t,
+        healthSmoothRef.current,
+        mode,
+        zoomRef.current,
+        panXRef.current,
+        panYRef.current,
+        valueRef.current
+      )
     }
 
     function onWheel(e: WheelEvent) {
@@ -1519,6 +1551,7 @@ export default function CoralReefCanvas({
   const safeLevel = Math.max(1, Math.min(6, titleLevel)) as 1 | 2 | 3 | 4 | 5 | 6
   const TitleTag  = `h${safeLevel}` as `h${typeof safeLevel}`
   const heroClass = `coral-reef-hero${variant === 'card' ? ' coral-reef-hero--card' : ''}`
+  const defaultZoom = isReefHealth ? 1.45 : 1.12
 
   return (
     <section className={heroClass} aria-label={isReefHealth ? 'Reef health viewer' : 'Reef Star Growth viewer'}>
@@ -1530,7 +1563,7 @@ export default function CoralReefCanvas({
           type="button"
           className="crc-view-reset"
           onClick={() => {
-            zoomRef.current = 1
+            zoomRef.current = defaultZoom
             panXRef.current = 0
             panYRef.current = 0
           }}
