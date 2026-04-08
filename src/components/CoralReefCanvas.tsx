@@ -44,14 +44,14 @@ interface CoralReefCanvasProps {
 // ─── Timeline helpers ─────────────────────────────────────────────────────────
 
 const STAR_FIRST = 0
-const STAR_LAST = 4
+const STAR_LAST = 48 // months since installation
 const STAR_SPAN = STAR_LAST - STAR_FIRST
-const STAR_TICKS = [0, 1, 2, 3, 4] as const
+const STAR_TICKS = [0, 12, 24, 36, 48] as const
 
-function growthHealthAtAge(ageYears: number): number {
-  // 0 → 4 years since installation.
-  // Use an ease-out curve so Year 1 already looks meaningfully different (storytelling goal).
-  const a = Math.max(STAR_FIRST, Math.min(STAR_LAST, ageYears))
+function growthHealthAtAge(ageMonths: number): number {
+  // 0 → 48 months since installation.
+  // Ease-out so early months show visible change, while still allowing a long, gradual ramp.
+  const a = Math.max(STAR_FIRST, Math.min(STAR_LAST, ageMonths))
   const t = STAR_SPAN === 0 ? 0 : (a - STAR_FIRST) / STAR_SPAN
   return 100 * Math.pow(t, 0.65)
 }
@@ -207,6 +207,7 @@ interface Scene {
   // Reef Star frame (growth mode only).
   reefStarFrame?: LineGeom
   reefStarTies?: LineGeom
+  reefStarFragments?: LineGeom
 
   frame: number
   w: number
@@ -372,21 +373,35 @@ function generateLinesGeom(segments: number[]): LineGeom {
   return { geom, proj }
 }
 
-function generateReefStarFrame(rng: () => number): { frame: LineGeom; ties: LineGeom; anchors: Vec3[] } {
-  // A simplified "Reef Star" (hex ring + spokes + diagonals), plus small "tie" strokes.
-  // Visual reference: MARRS Reef Stars are steel frames coated with coral sand/resin, with coral fragments attached.
-  const STAR_R = 120
-  const STAR_Y = -52
+function generateReefStarFrame(rng: () => number): { frame: LineGeom; ties: LineGeom; fragments: LineGeom; anchors: Vec3[] } {
+  // 3D "Reef Star" wireframe:
+  // - Approximate a sand-coated steel structure with depth (top + bottom rings + struts + legs).
+  // - Coral fragments are represented as small strapped stubs at anchor points.
+  //
+  // References (for shape/storytelling; exact dimensions are not required here):
+  // - MARRS Reef Stars are modular hexagonal steel structures interlocked over rubble, with coral fragments attached.
+  //   (See: GBR Biology summary / Reef Magic deployment notes) https://www.gbrbiology.com/2022/04/08/mars-and-coral-rubble-stabilisation/
+  const STAR_R_TOP = 122
+  const STAR_R_BOT = 108
+  const STAR_Y_TOP = -42
+  const STAR_Y_BOT = -62
+  const LEG_Y = -86
 
-  const verts: Vec3[] = []
+  const vertsTop: Vec3[] = []
+  const vertsBot: Vec3[] = []
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * TAU
-    verts.push({ x: Math.cos(a) * STAR_R, y: STAR_Y, z: Math.sin(a) * STAR_R })
+    vertsTop.push({ x: Math.cos(a) * STAR_R_TOP, y: STAR_Y_TOP, z: Math.sin(a) * STAR_R_TOP })
+    // Slight twist so it reads as a 3D frame during rotation.
+    const b = a + 0.18
+    vertsBot.push({ x: Math.cos(b) * STAR_R_BOT, y: STAR_Y_BOT, z: Math.sin(b) * STAR_R_BOT })
   }
-  const center: Vec3 = { x: 0, y: STAR_Y, z: 0 }
+  const centerTop: Vec3 = { x: 0, y: STAR_Y_TOP, z: 0 }
+  const centerBot: Vec3 = { x: 0, y: STAR_Y_BOT, z: 0 }
 
   const segs: number[] = []
   const ties: number[] = []
+  const fragments: number[] = []
 
   function addSeg(a: Vec3, b: Vec3, thick: number) {
     segs.push(a.x, a.y, a.z, b.x, b.y, b.z, thick)
@@ -399,29 +414,57 @@ function generateReefStarFrame(rng: () => number): { frame: LineGeom; ties: Line
       thick
     )
   }
+  function addFragment(p: Vec3, dir: Vec3, thick: number) {
+    const len = 9 + rng() * 7
+    fragments.push(
+      p.x, p.y, p.z,
+      p.x + dir.x * len, p.y + dir.y * len, p.z + dir.z * len,
+      thick
+    )
+  }
 
-  // Hex ring.
-  for (let i = 0; i < 6; i++) addSeg(verts[i], verts[(i + 1) % 6], 2.6)
-  // Spokes.
-  for (let i = 0; i < 6; i++) addSeg(verts[i], center, 2.2)
-  // Diagonals for a more "star" read.
-  for (let i = 0; i < 6; i++) addSeg(verts[i], verts[(i + 2) % 6], 1.8)
+  // Top + bottom hex rings.
+  for (let i = 0; i < 6; i++) addSeg(vertsTop[i], vertsTop[(i + 1) % 6], 2.6)
+  for (let i = 0; i < 6; i++) addSeg(vertsBot[i], vertsBot[(i + 1) % 6], 2.1)
+
+  // Struts between rings (gives depth).
+  for (let i = 0; i < 6; i++) addSeg(vertsTop[i], vertsBot[i], 1.7)
+
+  // Spokes (top and bottom).
+  for (let i = 0; i < 6; i++) addSeg(vertsTop[i], centerTop, 2.1)
+  for (let i = 0; i < 6; i++) addSeg(vertsBot[i], centerBot, 1.7)
+
+  // Diagonals on top ring for "star" read.
+  for (let i = 0; i < 6; i++) addSeg(vertsTop[i], vertsTop[(i + 2) % 6], 1.6)
+
+  // Legs (suggests it sits above rubble; helps 3D read).
+  for (let i = 0; i < 6; i++) {
+    const v = vertsBot[i]
+    addSeg(v, { x: v.x * 0.92, y: LEG_Y, z: v.z * 0.92 }, 1.5)
+  }
 
   // Attachment anchors: vertices + mid-spokes (where fragments would be tied).
   const anchors: Vec3[] = []
   for (let i = 0; i < 6; i++) {
-    const v = verts[i]
-    anchors.push({ x: v.x, y: v.y + 4, z: v.z })
-    anchors.push({ x: v.x * 0.55, y: v.y + 3, z: v.z * 0.55 })
+    const v = vertsTop[i]
+    anchors.push({ x: v.x, y: v.y + 3, z: v.z })
+    anchors.push({ x: v.x * 0.55, y: v.y + 2, z: v.z * 0.55 })
 
     // Tie stroke tangent around the ring.
     const a = (i / 6) * TAU
     const tx = -Math.sin(a)
     const tz = Math.cos(a)
     addTie({ x: v.x * 0.80, y: v.y, z: v.z * 0.80 }, { x: tx, y: 0, z: tz }, 1.4)
+
+    // Fragment stubs (look like strapped coral pieces at Month 0).
+    addFragment(
+      { x: v.x * 0.92, y: v.y + 1, z: v.z * 0.92 },
+      v3.norm({ x: tx * 0.15, y: 1, z: tz * 0.15 }),
+      2.2
+    )
   }
 
-  return { frame: generateLinesGeom(segs), ties: generateLinesGeom(ties), anchors }
+  return { frame: generateLinesGeom(segs), ties: generateLinesGeom(ties), fragments: generateLinesGeom(fragments), anchors }
 }
 
 function generateCoralFromAnchors(anchors: Vec3[], rng: () => number): { reef: ReefGeom; colonies: number } {
@@ -497,6 +540,7 @@ function generateScene(w: number, h: number, mode: CanvasMode): Scene {
   let colonyCount = 0
   let reefStarFrame: LineGeom | undefined
   let reefStarTies: LineGeom | undefined
+  let reefStarFragments: LineGeom | undefined
 
   if (mode === 'reef-health') {
     // A small reef field early, tapering down to a single survivor by TODAY.
@@ -523,6 +567,7 @@ function generateScene(w: number, h: number, mode: CanvasMode): Scene {
     const star = generateReefStarFrame(rng)
     reefStarFrame = star.frame
     reefStarTies = star.ties
+    reefStarFragments = star.fragments
     const coral = generateCoralFromAnchors(star.anchors, rng)
     reefs.push(coral.reef)
     colonyCount += coral.colonies
@@ -620,6 +665,7 @@ function generateScene(w: number, h: number, mode: CanvasMode): Scene {
     grainCanvas,
     reefStarFrame,
     reefStarTies,
+    reefStarFragments,
     frame: 0,
     w,
     h,
@@ -870,8 +916,8 @@ function drawFrame(
 ): void {
   const { w, h, reefs } = scene
   const cx   = w / 2
-  // Slightly low camera center so the specimen reads taller / more monumental (ARBORIST framing).
-  const cy   = h * 0.54
+  // Frame position: keep Reef Health centered; push Reef Star slightly lower to feel more monumental.
+  const cy   = mode === 'reef-health' ? (h * 0.50) : (h * 0.54)
   const ox = cx + panX
   const oy = cy + panY
   const rotY = (t / ROT_PERIOD) * TAU
@@ -920,7 +966,8 @@ function drawFrame(
             year < 2016 ? 3 :
               year < 2024 ? 2 : 1
     stress01 = stressBase01
-    keepTip01 = Math.max(0.04, Math.min(1, 1 - 0.92 * Math.pow(stress01, 0.9)))
+    // Keep a strong readable silhouette even in extreme years (avoid "nothing visible" failure mode).
+    keepTip01 = Math.max(0.14, Math.min(1, 1 - 0.88 * Math.pow(stress01, 0.9)))
     shrinkBase = 0.58 * Math.pow(stress01, 1.15)
   } else {
     reefVisibleCount = 1
@@ -942,10 +989,11 @@ function drawFrame(
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
 
-  // Reef Star frame (growth mode): visible at Year 0, gradually engulfed by coral by Year 4.
+  // Reef Star frame (growth mode): visible at Month 0, gradually engulfed by coral by Month 48.
   if (mode === 'reef-star-growth' && scene.reefStarFrame) {
     const frame = scene.reefStarFrame
     const ties = scene.reefStarTies
+    const fragments = scene.reefStarFragments
     const segCount = frame.geom.length / 7
 
     const frameAlpha = Math.max(0, Math.min(0.9, 0.9 * Math.pow(1 - health01, 0.9)))
@@ -1032,6 +1080,55 @@ function drawFrame(
         ctx.globalAlpha = frameAlpha * 0.85
         ctx.strokeStyle = '#cda15f'
         ctx.lineWidth = Math.max(0.6, 1.05 * zoom)
+        ctx.stroke()
+      }
+
+      if (fragments) {
+        const fragSegCount = fragments.geom.length / 7
+        for (let i = 0; i < fragSegCount; i++) {
+          const gi = i * 7
+          const pi = i * 5
+          const p1x = fragments.geom[gi + 0], p1y = fragments.geom[gi + 1], p1z = fragments.geom[gi + 2]
+          const p2x = fragments.geom[gi + 3], p2y = fragments.geom[gi + 4], p2z = fragments.geom[gi + 5]
+
+          const rp1x = p1x * c + p1z * s
+          const rp1z = -p1x * s + p1z * c
+          const rp2x = p2x * c + p2z * s
+          const rp2z = -p2x * s + p2z * c
+          const midZ = (rp1z + rp2z) * 0.5
+
+          const z1 = rp1z + FOV
+          const z2 = rp2z + FOV
+          const s1 = z1 > 1 ? FOV / z1 : 0.002
+          const s2 = z2 > 1 ? FOV / z2 : 0.002
+
+          fragments.proj[pi + 0] = ox + rp1x * s1 * zoom
+          fragments.proj[pi + 1] = oy - p1y * s1 * zoom
+          fragments.proj[pi + 2] = ox + rp2x * s2 * zoom
+          fragments.proj[pi + 3] = oy - p2y * s2 * zoom
+          fragments.proj[pi + 4] = midZ
+        }
+
+        ctx.beginPath()
+        for (let i = 0; i < fragSegCount; i++) {
+          const p = i * 5
+          ctx.moveTo(fragments.proj[p + 0], fragments.proj[p + 1])
+          ctx.lineTo(fragments.proj[p + 2], fragments.proj[p + 3])
+        }
+
+        // "Fragment stubs" read as strapped coral pieces at Month 0.
+        ctx.globalCompositeOperation = 'lighter'
+        ctx.filter = 'blur(7px)'
+        ctx.globalAlpha = Math.min(0.35, frameAlpha * 0.28)
+        ctx.strokeStyle = '#e0b26c'
+        ctx.lineWidth = Math.max(0.9, 2.2 * zoom)
+        ctx.stroke()
+        ctx.filter = 'none'
+        ctx.globalCompositeOperation = 'source-over'
+
+        ctx.globalAlpha = Math.min(0.9, frameAlpha)
+        ctx.strokeStyle = '#8b6a3a'
+        ctx.lineWidth = Math.max(0.75, 1.55 * zoom)
         ctx.stroke()
       }
     }
@@ -1407,11 +1504,12 @@ export default function CoralReefCanvas({
       //   large-scale Indonesia restoration program: Lange ID et al. (2024) Current Biology.
       //   DOI: 10.1016/j.cub.2024.02.009
       selectedValue === 0 ? 'REEF STAR INSTALL'
-        : selectedValue === 1 ? 'EARLY ENCRUSTATION'
-          : selectedValue === 2 ? 'BRANCHING THICKET'
-            : selectedValue === 3 ? 'STAR ENGULFS'
-              : selectedValue === 4 ? 'FUNCTIONAL RECOVERY'
-                : null
+        : selectedValue < 6 ? 'FRAGMENTS SECURED'
+          : selectedValue < 12 ? 'EARLY ENCRUSTATION'
+            : selectedValue < 24 ? 'BRANCHING STARTS'
+              : selectedValue < 36 ? 'THICKET BUILDS'
+                : selectedValue < 48 ? 'STAR ENGULFS'
+                  : 'FUNCTIONAL RECOVERY'
     )
   const isWarn = isReefHealth ? health < 72 : health < 35
 
@@ -1449,7 +1547,7 @@ export default function CoralReefCanvas({
 
       {/* ── Stats — top-right ──────────────────────────────────── */}
       <aside className="crc-stats" aria-label="Reef statistics" aria-live="polite">
-        <StatRow label={isReefHealth ? 'YEAR' : 'AGE'} value={String(selectedValue)} />
+        <StatRow label={isReefHealth ? 'YEAR' : 'MONTH'} value={String(selectedValue)} />
         <StatRow label={isReefHealth ? 'HEALTH' : 'GROWTH'} value={`${Math.round(health)}%`} warn={isWarn} />
         {isReefHealth && selectedValue > LAST_GCRMN_COVER_YEAR && healthSample.noaaAsOfDate && (
           <StatRow label="NOAA" value={healthSample.noaaAsOfDate} />
@@ -1501,14 +1599,14 @@ export default function CoralReefCanvas({
 
         <div className="crc-range-ends">
           <span>{minValue}</span>
-          <span>{isReefHealth ? `TODAY (${maxValue})` : maxValue}</span>
+          <span>{isReefHealth ? `TODAY (${maxValue})` : `${maxValue} mo`}</span>
         </div>
       </div>
 
       <span className="coral-reef-hero__sr-text">
         {isReefHealth
           ? `3D reef visualization. Use the year slider to explore changes from ${minValue} to ${maxValue}.`
-          : '3D reef restoration visualization. Use the scrubber to explore growth from year 0 to year 4.'
+          : '3D reef restoration visualization. Use the scrubber to explore growth from month 0 to month 48.'
         }
       </span>
     </section>
