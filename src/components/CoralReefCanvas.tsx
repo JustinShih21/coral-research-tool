@@ -152,7 +152,8 @@ function coralColor(mode: CanvasMode, colorIndex: number, health: number): strin
     const t = Math.max(0, Math.min(1, health / 100))
     return lerpColor(STAR_FRAGMENT_COLOR, HEALTHY_COLORS[colorIndex % 4], Math.pow(t, 0.85))
   }
-  // Keep the reef vibrant until a clear stress threshold, then push into stark bleaching.
+  // Reef health: bleaching should read as *pale/white but still visible* (not “dark/invisible”).
+  // We keep value (brightness) high while draining saturation into bone-white, then add algae staining later.
   const bleachT = Math.max(0, Math.min(1, (92 - health) / 55))
   const algaeT = Math.max(0, Math.min(1, (48 - health) / 48))
   const bleached = lerpColor(HEALTHY_COLORS[colorIndex % 4], BLEACH_COLOR, bleachT)
@@ -379,19 +380,23 @@ function generateReefStarFrame(rng: () => number): { frame: LineGeom; ties: Line
   // - Coral fragments are represented as small strapped stubs at anchor points.
   //
   // References (for shape/storytelling; exact dimensions are not required here):
-  // - MARRS Reef Stars are modular hexagonal steel structures interlocked over rubble, with coral fragments attached.
-  //   (See: GBR Biology summary / Reef Magic deployment notes) https://www.gbrbiology.com/2022/04/08/mars-and-coral-rubble-stabilisation/
-  // Match the "low dome / cage" look seen in BuildingCoral's coating photos.
-  // Example photo: https://building-coral.transforms.svdcdn.com/production/assets/images/RVT_5910.jpeg (sand coating)
-  const BASE_R = 150
-  const MID_R = 108
-  const BASE_Y = -72
-  const MID_Y = -54
-  const APEX_Y = -34
-  const LEG_Y = -96
+  // - Mars / MARRS restoration stories describe "Reef Stars" as modular steel structures placed over rubble,
+  //   coated (often with sand), and used as attachment points for live coral fragments.
+  //   https://www.mars.com/news-and-stories/articles/coral-reef-ecosystem-restoration
+  // - BuildingCoral photos show the characteristic low geodesic dome / cage silhouette during sand coating.
+  //   Example: https://building-coral.transforms.svdcdn.com/production/assets/images/RVT_5910.jpeg
+  const BASE_R = 182
+  const MID_R = 132
+  const TOP_R = 74
+  const BASE_Y = -40
+  const MID_Y = -18
+  const TOP_Y = 4
+  const HUB_Y = 22
+  const LEG_Y = -72
 
   const vertsBase: Vec3[] = []
   const vertsMid: Vec3[] = []
+  const vertsTop: Vec3[] = []
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * TAU
     const jx = (rng() - 0.5) * 6
@@ -399,8 +404,10 @@ function generateReefStarFrame(rng: () => number): { frame: LineGeom; ties: Line
     vertsBase.push({ x: Math.cos(a) * BASE_R + jx, y: BASE_Y + (rng() - 0.5) * 3, z: Math.sin(a) * BASE_R + jz })
     const b = a + 0.12
     vertsMid.push({ x: Math.cos(b) * MID_R, y: MID_Y + (rng() - 0.5) * 2, z: Math.sin(b) * MID_R })
+    const c = a + 0.06
+    vertsTop.push({ x: Math.cos(c) * TOP_R, y: TOP_Y + (rng() - 0.5) * 1.5, z: Math.sin(c) * TOP_R })
   }
-  const apex: Vec3 = { x: 0, y: APEX_Y, z: 0 }
+  const hub: Vec3 = { x: 0, y: HUB_Y, z: 0 }
 
   const segs: number[] = []
   const ties: number[] = []
@@ -427,22 +434,31 @@ function generateReefStarFrame(rng: () => number): { frame: LineGeom; ties: Line
   }
 
   // Base ring.
-  for (let i = 0; i < 6; i++) addSeg(vertsBase[i], vertsBase[(i + 1) % 6], 2.5)
+  for (let i = 0; i < 6; i++) addSeg(vertsBase[i], vertsBase[(i + 1) % 6], 3.0)
   // Mid ring.
-  for (let i = 0; i < 6; i++) addSeg(vertsMid[i], vertsMid[(i + 1) % 6], 2.0)
+  for (let i = 0; i < 6; i++) addSeg(vertsMid[i], vertsMid[(i + 1) % 6], 2.4)
+  // Top ring.
+  for (let i = 0; i < 6; i++) addSeg(vertsTop[i], vertsTop[(i + 1) % 6], 2.05)
   // Struts from base to mid (triangulated cage).
   for (let i = 0; i < 6; i++) {
-    addSeg(vertsBase[i], vertsMid[i], 1.7)
-    addSeg(vertsBase[(i + 1) % 6], vertsMid[i], 1.55)
+    addSeg(vertsBase[i], vertsMid[i], 2.05)
+    addSeg(vertsBase[(i + 1) % 6], vertsMid[i], 1.85)
   }
-  // Struts from mid to apex.
-  for (let i = 0; i < 6; i++) addSeg(vertsMid[i], apex, 1.65)
+  // Struts from mid to top (dome ribs).
+  for (let i = 0; i < 6; i++) {
+    addSeg(vertsMid[i], vertsTop[i], 1.75)
+    addSeg(vertsMid[i], vertsTop[(i + 1) % 6], 1.55)
+  }
+  // Struts from top to hub (gives the dome a "cage" crown).
+  for (let i = 0; i < 6; i++) addSeg(vertsTop[i], hub, 1.55)
   // Cross braces on base (star-ish read).
-  for (let i = 0; i < 6; i++) addSeg(vertsBase[i], vertsBase[(i + 2) % 6], 1.35)
+  for (let i = 0; i < 6; i++) addSeg(vertsBase[i], vertsBase[(i + 2) % 6], 1.45)
+  // Mid cross braces (prevents a "flat hexagon" read).
+  for (let i = 0; i < 3; i++) addSeg(vertsMid[i], vertsMid[(i + 3) % 6], 1.25)
   // Legs (keeps it elevated above rubble).
   for (let i = 0; i < 6; i++) {
     const v = vertsBase[i]
-    addSeg(v, { x: v.x * 0.86, y: LEG_Y, z: v.z * 0.86 }, 1.5)
+    addSeg(v, { x: v.x * 0.84, y: LEG_Y, z: v.z * 0.84 }, 1.75)
   }
 
   // Attachment anchors: vertices + mid-spokes (where fragments would be tied).
@@ -450,21 +466,28 @@ function generateReefStarFrame(rng: () => number): { frame: LineGeom; ties: Line
   for (let i = 0; i < 6; i++) {
     const vb = vertsBase[i]
     const vm = vertsMid[i]
+    const vt = vertsTop[i]
     anchors.push({ x: vb.x * 0.92, y: vb.y + 2, z: vb.z * 0.92 })
     anchors.push({ x: vm.x * 0.98, y: vm.y + 2, z: vm.z * 0.98 })
-    anchors.push({ x: vm.x * 0.55, y: vm.y + 1, z: vm.z * 0.55 })
+    anchors.push({ x: vt.x * 0.98, y: vt.y + 2, z: vt.z * 0.98 })
 
     // Tie stroke tangent around the ring.
     const a = (i / 6) * TAU
     const tx = -Math.sin(a)
     const tz = Math.cos(a)
     addTie({ x: vb.x * 0.78, y: vb.y, z: vb.z * 0.78 }, { x: tx, y: 0, z: tz }, 1.4)
+    addTie({ x: vt.x * 0.86, y: vt.y, z: vt.z * 0.86 }, { x: tx, y: 0, z: tz }, 1.2)
 
     // Fragment stubs (look like strapped coral pieces at Month 0).
     addFragment(
       { x: vb.x * 0.92, y: vb.y + 2, z: vb.z * 0.92 },
       v3.norm({ x: tx * 0.15, y: 1, z: tz * 0.15 }),
       2.2
+    )
+    addFragment(
+      { x: vt.x * 0.98, y: vt.y + 1.5, z: vt.z * 0.98 },
+      v3.norm({ x: tx * 0.10, y: 1, z: tz * 0.10 }),
+      1.95
     )
   }
 
@@ -550,15 +573,16 @@ function generateScene(w: number, h: number, mode: CanvasMode): Scene {
     // A small reef field early, tapering down to a single survivor by TODAY.
     const offsets: Vec3[] = [
       { x: 0, y: 0, z: 0 },
-      { x: -300, y: -10, z: 150 },
-      { x: 300, y: 12, z: 120 },
-      { x: -190, y: 14, z: -260 },
-      { x: 210, y: -14, z: -240 },
-      { x: 0, y: 22, z: 330 },
+      { x: -260, y: -14, z: 160 },
+      { x: 260, y: 10, z: 150 },
+      { x: -210, y: 18, z: -220 },
+      { x: 220, y: -18, z: -210 },
+      { x: 0, y: 28, z: 280 },
     ]
-    // Larger scales + slightly more colonies to ensure the reef field fills the frame.
-    const scales = [1.25, 1.05, 1.08, 0.98, 1.0, 0.95]
-    const coloniesPerReef = [6, 4, 4, 4, 4, 4]
+    // Larger scales so a single survivor still fills most of the frame, while earlier years feel sprawling.
+    // Keep colonies modest to avoid performance regressions; rely on framing + scale for "coverage".
+    const scales = [2.25, 1.45, 1.55, 1.35, 1.35, 1.25]
+    const coloniesPerReef = [7, 5, 5, 4, 4, 4]
 
     for (let r = 0; r < offsets.length; r++) {
       const rng = makeRng(1337 + r * 9973)
@@ -701,11 +725,13 @@ function renderBloom(scene: Scene, health: number, cx: number, cy: number, mode:
     : (1 - health01) * 0.35
 
   const [r, g, b] = mode === 'reef-health'
-    ? lerpRgb('#05151f', '#221308', bloomT)
+    // Healthy: luminous teal waterlight; stressed: warm “heat haze” tint.
+    ? lerpRgb('#08304a', '#3b1a0c', bloomT)
     : lerpRgb('#03060a', '#071812', bloomT)
 
   const str = mode === 'reef-health'
-    ? (0.09 + 0.22 * health01)
+    // Lift exposure so early monitored years aren't a near-black silhouette.
+    ? (0.16 + 0.34 * health01)
     : (0.03 + 0.14 * health01)
 
   const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(w, h) * 0.55)
@@ -713,6 +739,16 @@ function renderBloom(scene: Scene, health: number, cx: number, cy: number, mode:
   grad.addColorStop(1, 'rgba(0,0,0,0)')
   ctx.fillStyle = grad
   ctx.fillRect(0, 0, w, h)
+}
+
+// Reef-field collapse staging for Reef Health storytelling (visual-only; not displayed as explanatory UI text).
+// Outer reefs fade out over time under repeated heat-stress periods, leaving only the core survivor by TODAY.
+// Event anchors align to NOAA CRW global bleaching event years (1998, 2010, 2014–2017) and the ongoing 4th event (2023+).
+const REEF_FIELD_COLLAPSE_START_YEAR = [9999, 2024, 2016, 2014, 2010, 1998] as const
+const REEF_FIELD_COLLAPSE_SPAN_YEARS = [9999, 2.2, 4.2, 4.8, 6.2, 8.0] as const
+function easeInOutCubic01(t: number) {
+  const tc = Math.max(0, Math.min(1, t))
+  return tc < 0.5 ? 4 * tc * tc * tc : 1 - Math.pow(-2 * tc + 2, 3) / 2
 }
 
 function insertionSortByMidZ(geom: Float32Array, proj: Float32Array, tip: Float32Array, start: number, end: number): void {
@@ -930,7 +966,7 @@ function drawFrame(
   scene.frame++
 
   // Void background (slightly lifted from pure black so structure is readable).
-  ctx.fillStyle = mode === 'reef-health' ? '#01040a' : '#000'
+  ctx.fillStyle = mode === 'reef-health' ? '#030a16' : '#000'
   ctx.fillRect(0, 0, w, h)
 
   // Cache health-driven styles (only changes while scrubbing the slider).
@@ -957,25 +993,16 @@ function drawFrame(
   // Storytelling controls:
   // - Reef Health: multiple reefs early, fewer survivors later; tips die back and branches shrink under stress.
   // - Reef Star Growth: structure reveals outward as the coral grows.
-  let reefVisibleCount = 1
   let stress01 = stressBase01
   let keepTip01 = 1
   let shrinkBase = 0
 
   if (mode === 'reef-health') {
-    const year = value
-    reefVisibleCount =
-      year < 1998 ? 6 :
-        year < 2010 ? 5 :
-          year < 2014 ? 4 :
-            year < 2016 ? 3 :
-              year < 2024 ? 2 : 1
     stress01 = stressBase01
     // Keep a strong readable silhouette even in extreme years (avoid "nothing visible" failure mode).
     keepTip01 = Math.max(0.14, Math.min(1, 1 - 0.88 * Math.pow(stress01, 0.9)))
     shrinkBase = 0.58 * Math.pow(stress01, 1.15)
   } else {
-    reefVisibleCount = 1
     keepTip01 = Math.max(0.08, Math.min(1, 0.08 + 0.92 * Math.pow(health01, 1.05)))
     shrinkBase = 0
   }
@@ -1001,8 +1028,12 @@ function drawFrame(
     const fragments = scene.reefStarFragments
     const segCount = frame.geom.length / 7
 
-    const frameAlpha = Math.max(0, Math.min(0.9, 0.9 * Math.pow(1 - health01, 0.9)))
+    // Keep the metal frame visible throughout growth (it should not "disappear").
+    // The engulfing story is driven by coral density/thickness, not by fading the frame away.
+    const frameAlpha = Math.max(0.36, Math.min(0.86, 0.66 - 0.18 * health01))
     if (frameAlpha > 0.002) {
+      let minZ = 1e9
+      let maxZ = -1e9
       for (let i = 0; i < segCount; i++) {
         const gi = i * 7
         const pi = i * 5
@@ -1025,28 +1056,65 @@ function drawFrame(
         frame.proj[pi + 2] = ox + rp2x * s2 * zoom
         frame.proj[pi + 3] = oy - p2y * s2 * zoom
         frame.proj[pi + 4] = midZ
+        if (midZ < minZ) minZ = midZ
+        if (midZ > maxZ) maxZ = midZ
       }
 
+      const zSpan = Math.max(1e-3, maxZ - minZ)
+      const z0 = minZ + zSpan * 0.34
+      const z1 = minZ + zSpan * 0.68
+      const lw = Math.max(1.05, 2.15 * zoom)
+
+      // Depth-shaded 3-pass stroke: back → front to sell a 3D cage (no per-segment styling in the hot loop).
+      ctx.globalCompositeOperation = 'source-over'
+      ctx.filter = 'none'
+
+      // Back bucket (darker steel).
       ctx.beginPath()
       for (let i = 0; i < segCount; i++) {
         const p = i * 5
+        if (frame.proj[p + 4] > z0) continue
         ctx.moveTo(frame.proj[p + 0], frame.proj[p + 1])
         ctx.lineTo(frame.proj[p + 2], frame.proj[p + 3])
       }
-
-      const lw = Math.max(0.9, 1.8 * zoom)
-      ctx.globalCompositeOperation = 'lighter'
-      ctx.filter = 'blur(6px)'
-      ctx.globalAlpha = frameAlpha * 0.25
-      ctx.strokeStyle = '#b8c0cc'
-      ctx.lineWidth = lw * 2.2
+      ctx.globalAlpha = frameAlpha * 0.78
+      ctx.strokeStyle = '#4d5868'
+      ctx.lineWidth = lw * 0.92
       ctx.stroke()
 
+      // Mid bucket.
+      ctx.beginPath()
+      for (let i = 0; i < segCount; i++) {
+        const p = i * 5
+        const z = frame.proj[p + 4]
+        if (z <= z0 || z > z1) continue
+        ctx.moveTo(frame.proj[p + 0], frame.proj[p + 1])
+        ctx.lineTo(frame.proj[p + 2], frame.proj[p + 3])
+      }
+      ctx.globalAlpha = frameAlpha
+      ctx.strokeStyle = '#7b8797'
+      ctx.lineWidth = lw
+      ctx.stroke()
+
+      // Front bucket + specular glint.
+      ctx.beginPath()
+      for (let i = 0; i < segCount; i++) {
+        const p = i * 5
+        if (frame.proj[p + 4] <= z1) continue
+        ctx.moveTo(frame.proj[p + 0], frame.proj[p + 1])
+        ctx.lineTo(frame.proj[p + 2], frame.proj[p + 3])
+      }
+      ctx.globalCompositeOperation = 'lighter'
+      ctx.filter = 'blur(4px)'
+      ctx.globalAlpha = frameAlpha * 0.28
+      ctx.strokeStyle = '#c8d3e6'
+      ctx.lineWidth = lw * 1.95
+      ctx.stroke()
       ctx.filter = 'none'
       ctx.globalCompositeOperation = 'source-over'
-      ctx.globalAlpha = frameAlpha
-      ctx.strokeStyle = '#7f8896'
-      ctx.lineWidth = lw
+      ctx.globalAlpha = frameAlpha * 0.96
+      ctx.strokeStyle = '#aebcd1'
+      ctx.lineWidth = lw * 0.96
       ctx.stroke()
 
       if (ties) {
@@ -1082,9 +1150,10 @@ function drawFrame(
           ctx.lineTo(ties.proj[p + 2], ties.proj[p + 3])
         }
 
-        ctx.globalAlpha = frameAlpha * 0.85
-        ctx.strokeStyle = '#cda15f'
-        ctx.lineWidth = Math.max(0.6, 1.05 * zoom)
+        // Dark tie bands (zip ties / tape) securing fragments to the steel frame.
+        ctx.globalAlpha = Math.min(0.75, frameAlpha * (0.70 - 0.30 * health01))
+        ctx.strokeStyle = '#1a1f28'
+        ctx.lineWidth = Math.max(0.65, 1.45 * zoom)
         ctx.stroke()
       }
 
@@ -1124,14 +1193,14 @@ function drawFrame(
         // "Fragment stubs" read as strapped coral pieces at Month 0.
         ctx.globalCompositeOperation = 'lighter'
         ctx.filter = 'blur(7px)'
-        ctx.globalAlpha = Math.min(0.35, frameAlpha * 0.28)
+        ctx.globalAlpha = Math.min(0.42, frameAlpha * (0.32 - 0.18 * health01))
         ctx.strokeStyle = '#e0b26c'
         ctx.lineWidth = Math.max(0.9, 2.2 * zoom)
         ctx.stroke()
         ctx.filter = 'none'
         ctx.globalCompositeOperation = 'source-over'
 
-        ctx.globalAlpha = Math.min(0.9, frameAlpha)
+        ctx.globalAlpha = Math.min(0.92, frameAlpha * (0.92 - 0.45 * health01))
         ctx.strokeStyle = '#8b6a3a'
         ctx.lineWidth = Math.max(0.75, 1.55 * zoom)
         ctx.stroke()
@@ -1143,11 +1212,28 @@ function drawFrame(
     ctx.filter = 'none'
   }
 
-  const reefsToDraw = Math.max(0, Math.min(reefs.length, reefVisibleCount))
-  for (let reefIndex = 0; reefIndex < reefsToDraw; reefIndex++) {
+  for (let reefIndex = 0; reefIndex < reefs.length; reefIndex++) {
     const reef = reefs[reefIndex]
     const { geom, proj, groupStart, tip } = reef
-    const reefFade = mode === 'reef-health' ? Math.max(0.55, 1 - reefIndex * 0.10) : 1
+    let reefLife01 = 1
+    let keepTipReef = keepTip01
+    let shrinkReef = shrinkBase
+
+    if (mode === 'reef-health') {
+      const startY = REEF_FIELD_COLLAPSE_START_YEAR[reefIndex] ?? 9999
+      const spanY = REEF_FIELD_COLLAPSE_SPAN_YEARS[reefIndex] ?? 6.0
+      const tDie = spanY <= 0 ? 1 : (value - startY) / spanY
+      reefLife01 = 1 - easeInOutCubic01(tDie)
+      if (reefLife01 <= 0.01) continue
+
+      // Outer reefs collapse sooner/harder: fade + tip dieback + structural shrink.
+      const reefStress01 = Math.max(0, Math.min(1, stress01 + (1 - reefLife01) * 0.62))
+      keepTipReef = Math.max(0.10, Math.min(1, 1 - 0.90 * Math.pow(reefStress01, 0.92)))
+      shrinkReef = 0.64 * Math.pow(reefStress01, 1.12)
+    }
+
+    const baseFade = mode === 'reef-health' ? Math.max(0.52, 1 - reefIndex * 0.09) : 1
+    const reefFade = baseFade * reefLife01
 
     let th0 = 0, th1 = 0, th2 = 0, th3 = 0
     let n0 = 0, n1 = 0, n2 = 0, n3 = 0
@@ -1159,7 +1245,7 @@ function drawFrame(
       for (let i = start; i < end; i++) {
         const tip01 = tip[i]
         const pi = i * 5
-        if (tip01 > keepTip01) {
+        if (tip01 > keepTipReef) {
           proj[pi + 4] = -1e9
           continue
         }
@@ -1174,7 +1260,7 @@ function drawFrame(
         const rp2x0 = p2x * c + p2z * s
         const rp2z0 = -p2x * s + p2z * c
 
-        const shrink = shrinkBase > 0 ? (1 - shrinkBase * tip01) : 1
+        const shrink = shrinkReef > 0 ? (1 - shrinkReef * tip01) : 1
         const rp2x = rp1x + (rp2x0 - rp1x) * shrink
         const rp2z = rp1z + (rp2z0 - rp1z) * shrink
         const rp2y = p1y + (p2y - p1y) * shrink
@@ -1220,7 +1306,7 @@ function drawFrame(
 
       ctx.beginPath()
       for (let i = start; i < end; i++) {
-        if (tip[i] > keepTip01) continue
+        if (tip[i] > keepTipReef) continue
         const p = i * 5
         if (proj[p + 4] <= -1e8) continue
         ctx.moveTo(proj[p + 0], proj[p + 1])
@@ -1228,7 +1314,7 @@ function drawFrame(
       }
 
       const lineW = Math.max(
-        0.35,
+        mode === 'reef-health' ? 0.55 : 0.35,
         group === 0 ? avgTh0 : group === 1 ? avgTh1 : group === 2 ? avgTh2 : avgTh3
       )
 
@@ -1250,6 +1336,25 @@ function drawFrame(
     }
   }
 
+  // Reef Star outline pass (after coral): keep the frame readable even when densely overgrown.
+  if (mode === 'reef-star-growth' && scene.reefStarFrame) {
+    const frame = scene.reefStarFrame
+    const segCount = frame.geom.length / 7
+    ctx.beginPath()
+    for (let i = 0; i < segCount; i++) {
+      const p = i * 5
+      ctx.moveTo(frame.proj[p + 0], frame.proj[p + 1])
+      ctx.lineTo(frame.proj[p + 2], frame.proj[p + 3])
+    }
+    ctx.globalCompositeOperation = 'lighter'
+    ctx.globalAlpha = 0.08 + 0.06 * (1 - health01)
+    ctx.strokeStyle = '#8fa6c8'
+    ctx.lineWidth = Math.max(0.7, 1.35 * zoom)
+    ctx.stroke()
+    ctx.globalCompositeOperation = 'source-over'
+    ctx.globalAlpha = 1
+  }
+
   // Fish (drawn after coral; orbit order, no depth-sort per fish).
   const fish = scene.fish
   const maxFish = scene.fishCount
@@ -1263,7 +1368,7 @@ function drawFrame(
   const fadeIndex = fade > 0.001 && fullCount < maxFish ? fullCount : -1
   const fishBaseAlpha = mode === 'reef-star-growth'
     ? (0.16 + 0.84 * health01)
-    : (0.06 + 0.24 * (1 - stress01))
+    : (0.03 + 0.17 * (1 - stress01))
 
   // Bodies: batch by color for fully-visible fish.
   for (let group = 0; group < 4; group++) {
@@ -1308,7 +1413,8 @@ function drawFrame(
 
   // Subtle post overlays (ARBORIST: felt, not seen).
   ctx.globalCompositeOperation = 'source-over'
-  ctx.globalAlpha = mode === 'reef-health' ? 0.55 : 1
+  // Reef Health: reduce vignette so early years don't read as "invisible".
+  ctx.globalAlpha = mode === 'reef-health' ? 0.34 : 1
   ctx.drawImage(scene.vignetteCanvas, 0, 0)
   ctx.globalAlpha = mode === 'reef-star-growth' ? 0.05 : 0.03
   ctx.globalCompositeOperation = 'soft-light'
@@ -1375,7 +1481,7 @@ export default function CoralReefCanvas({
     canvas.style.cursor = 'grab'
     canvas.style.touchAction = 'none'
 
-    const defaultZoom = mode === 'reef-health' ? 1.45 : 1.12
+    const defaultZoom = mode === 'reef-health' ? 1.85 : 1.12
     zoomRef.current = defaultZoom
     panXRef.current = 0
     panYRef.current = mode === 'reef-health' ? 0 : 0
@@ -1551,7 +1657,7 @@ export default function CoralReefCanvas({
   const safeLevel = Math.max(1, Math.min(6, titleLevel)) as 1 | 2 | 3 | 4 | 5 | 6
   const TitleTag  = `h${safeLevel}` as `h${typeof safeLevel}`
   const heroClass = `coral-reef-hero${variant === 'card' ? ' coral-reef-hero--card' : ''}`
-  const defaultZoom = isReefHealth ? 1.45 : 1.12
+  const defaultZoom = isReefHealth ? 1.85 : 1.12
 
   return (
     <section className={heroClass} aria-label={isReefHealth ? 'Reef health viewer' : 'Reef Star Growth viewer'}>
@@ -1609,7 +1715,7 @@ export default function CoralReefCanvas({
             step={1}
             value={selectedValue}
             onChange={e => setSelectedValue(Number(e.target.value))}
-            aria-label={isReefHealth ? 'Select year to view reef health' : 'Select years since installation'}
+            aria-label={isReefHealth ? 'Select year to view reef health' : 'Select months since installation'}
           />
           <div className="crc-ticks" aria-hidden>
             {isReefHealth
