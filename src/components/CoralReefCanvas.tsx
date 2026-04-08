@@ -44,16 +44,16 @@ interface CoralReefCanvasProps {
 // ─── Timeline helpers ─────────────────────────────────────────────────────────
 
 const STAR_FIRST = 0
-const STAR_LAST = 48 // months since installation
+const STAR_LAST = 72 // months since installation
 const STAR_SPAN = STAR_LAST - STAR_FIRST
-const STAR_TICKS = [0, 12, 24, 36, 48] as const
+const STAR_TICKS = [0, 12, 24, 36, 48, 60, 72] as const
 
 function growthHealthAtAge(ageMonths: number): number {
-  // 0 → 48 months since installation.
-  // Ease-out so early months show visible change, while still allowing a long, gradual ramp.
+  // 0 → 72 months since installation.
+  // Use a gentle ease so 2-month steps still feel gradual (no popping).
   const a = Math.max(STAR_FIRST, Math.min(STAR_LAST, ageMonths))
   const t = STAR_SPAN === 0 ? 0 : (a - STAR_FIRST) / STAR_SPAN
-  return 100 * Math.pow(t, 0.65)
+  return 100 * Math.pow(t, 0.85)
 }
 
 function reefHealthIndexAtYear(year: number): { health: number; noaaAsOfDate?: string } {
@@ -174,6 +174,12 @@ interface ReefGeom {
   tip: Float32Array
   // Pre-sorted by colorIndex: groupStart boundaries for 4 color groups
   groupStart: GroupStart
+
+  // Reef Health only: per-reef collapse staging for field storytelling.
+  // These are computed at scene-build time (resize) so the draw loop stays allocation-free.
+  collapseStartYear?: number
+  collapseSpanYears?: number
+  baseFade?: number
 }
 
 interface LineGeom {
@@ -278,7 +284,8 @@ function generateReefGeom(
   offset: Vec3,
   scale: number,
   colonyLayout: Array<{ phi: number; alpha: number }>,
-  rng: () => number
+  rng: () => number,
+  meta?: { collapseStartYear?: number; collapseSpanYears?: number; baseFade?: number }
 ): { reef: ReefGeom; colonies: number } {
   const branchesByColor: number[][] = [[], [], [], []]
   const tipByColor: number[][] = [[], [], [], []]
@@ -307,22 +314,27 @@ function generateReefGeom(
       z: normal.z * blend + UP.z * (1 - blend),
     })
 
+    // Build a *thicket* per colony (multiple primary stems) so the scene reads as many colonies,
+    // not a couple of long "sticks" pointing at the viewer.
     const spreadRad = phi < 42
-      ? (26 + rng() * 9)  * Math.PI / 180
-      : (36 + rng() * 12) * Math.PI / 180
+      ? (30 + rng() * 10)  * Math.PI / 180
+      : (38 + rng() * 14) * Math.PI / 180
 
-    const maxDepth = phi < 42 ? 5 : 4
-    buildBranches3D(
-      origin, growDir, branchLen,
-      (4.6 + rng() * 1.4) * scale,
-      maxDepth,
-      maxDepth,
-      spreadRad,
-      i % 4,
-      branchesByColor,
-      tipByColor,
-      rng
-    )
+    const baseDepth = phi < 42 ? 4 : 3
+    const baseThick = (4.2 + rng() * 1.0) * scale
+    const baseLen = branchLen * (0.72 + rng() * 0.18)
+    const perp = randPerp(rng, growDir)
+    const fan = spreadRad * (0.55 + rng() * 0.25)
+
+    const d1 = v3.norm(v3.rotAround(growDir, perp, fan))
+    const d2 = v3.norm(v3.rotAround(growDir, perp, -fan))
+    const d3 = v3.norm(v3.rotAround(growDir, normal, (rng() - 0.5) * 1.0))
+
+    buildBranches3D(origin, d1, baseLen, baseThick * 0.78, baseDepth, baseDepth, spreadRad, i % 4, branchesByColor, tipByColor, rng)
+    buildBranches3D(origin, d2, baseLen, baseThick * 0.78, baseDepth, baseDepth, spreadRad, (i + 1) % 4, branchesByColor, tipByColor, rng)
+    if (i === 0 || (rng() > 0.55 && phi > 45)) {
+      buildBranches3D(origin, d3, baseLen * 0.92, baseThick * 0.70, Math.max(2, baseDepth - 1), baseDepth, spreadRad, (i + 2) % 4, branchesByColor, tipByColor, rng)
+    }
   })
 
   const group0 = branchesByColor[0].length / 7
@@ -364,7 +376,7 @@ function generateReefGeom(
   ]
 
   const proj = new Float32Array(total * 5)
-  return { reef: { geom, proj, tip, groupStart }, colonies: colonyLayout.length }
+  return { reef: { geom, proj, tip, groupStart, ...meta }, colonies: colonyLayout.length }
 }
 
 function generateLinesGeom(segments: number[]): LineGeom {
@@ -570,24 +582,52 @@ function generateScene(w: number, h: number, mode: CanvasMode): Scene {
   let reefStarFragments: LineGeom | undefined
 
   if (mode === 'reef-health') {
-    // A small reef field early, tapering down to a single survivor by TODAY.
-    const offsets: Vec3[] = [
-      { x: 0, y: 0, z: 0 },
-      { x: -260, y: -14, z: 160 },
-      { x: 260, y: 10, z: 150 },
-      { x: -210, y: 18, z: -220 },
-      { x: 220, y: -18, z: -210 },
-      { x: 0, y: 28, z: 280 },
-    ]
-    // Larger scales so a single survivor still fills most of the frame, while earlier years feel sprawling.
-    // Keep colonies modest to avoid performance regressions; rely on framing + scale for "coverage".
-    const scales = [2.25, 1.45, 1.55, 1.35, 1.35, 1.25]
-    const coloniesPerReef = [7, 5, 5, 4, 4, 4]
+    // Reef field: many separate bommies/colonies early; collapses to a core survivor by TODAY.
+    // Keep geometry budgets modest (typed arrays + batched strokes stay fast).
+    const rng = makeRng(1337)
 
-    for (let r = 0; r < offsets.length; r++) {
-      const rng = makeRng(1337 + r * 9973)
-      const layout = buildReefLayout(coloniesPerReef[r], rng)
-      const { reef, colonies } = generateReefGeom(offsets[r], scales[r], layout, rng)
+    const placements: Array<{ offset: Vec3; scale: number; colonies: number; start?: number; span?: number; fade?: number }> = []
+    placements.push({ offset: { x: 0, y: 0, z: 0 }, scale: 1.25, colonies: 7, start: 9999, span: 1, fade: 1 })
+
+    const rings = [
+      { count: 7, r: 360, y: -8, scale: 1.05, colonies: 6 },
+      { count: 11, r: 560, y: -16, scale: 0.92, colonies: 5 },
+    ]
+    for (let ringIndex = 0; ringIndex < rings.length; ringIndex++) {
+      const ring = rings[ringIndex]
+      for (let i = 0; i < ring.count; i++) {
+        const a = (i / ring.count) * TAU + (rng() - 0.5) * 0.12
+        const jr = (rng() - 0.5) * 34
+        const ox = Math.cos(a) * (ring.r + jr)
+        const oz = Math.sin(a) * (ring.r + jr)
+        const oy = ring.y + (rng() - 0.5) * 18
+        const dist = Math.sqrt(ox * ox + oz * oz)
+        const t = dist / 560
+        const start = t > 0.82 ? 1998 : t > 0.62 ? 2010 : 2014
+        const span = t > 0.82 ? 9.0 : t > 0.62 ? 6.5 : 5.0
+        const fade = t > 0.82 ? 0.72 : t > 0.62 ? 0.82 : 0.90
+        placements.push({
+          offset: { x: ox, y: oy, z: oz },
+          scale: ring.scale * (0.94 + rng() * 0.14),
+          colonies: ring.colonies + (rng() > 0.65 ? 1 : 0),
+          start,
+          span,
+          fade,
+        })
+      }
+    }
+
+    for (let r = 0; r < placements.length; r++) {
+      const p = placements[r]
+      const reefRng = makeRng(2000 + r * 9973)
+      const layout = buildReefLayout(p.colonies, reefRng)
+      const { reef, colonies } = generateReefGeom(
+        p.offset,
+        p.scale,
+        layout,
+        reefRng,
+        { collapseStartYear: p.start, collapseSpanYears: p.span, baseFade: p.fade }
+      )
       reefs.push(reef)
       colonyCount += colonies
     }
@@ -741,11 +781,6 @@ function renderBloom(scene: Scene, health: number, cx: number, cy: number, mode:
   ctx.fillRect(0, 0, w, h)
 }
 
-// Reef-field collapse staging for Reef Health storytelling (visual-only; not displayed as explanatory UI text).
-// Outer reefs fade out over time under repeated heat-stress periods, leaving only the core survivor by TODAY.
-// Event anchors align to NOAA CRW global bleaching event years (1998, 2010, 2014–2017) and the ongoing 4th event (2023+).
-const REEF_FIELD_COLLAPSE_START_YEAR = [9999, 2024, 2016, 2014, 2010, 1998] as const
-const REEF_FIELD_COLLAPSE_SPAN_YEARS = [9999, 2.2, 4.2, 4.8, 6.2, 8.0] as const
 function easeInOutCubic01(t: number) {
   const tc = Math.max(0, Math.min(1, t))
   return tc < 0.5 ? 4 * tc * tc * tc : 1 - Math.pow(-2 * tc + 2, 3) / 2
@@ -965,8 +1000,8 @@ function drawFrame(
 
   scene.frame++
 
-  // Void background (slightly lifted from pure black so structure is readable).
-  ctx.fillStyle = mode === 'reef-health' ? '#030a16' : '#000'
+  // Background: keep Reef Health brighter so coral reads; keep Reef Star a black studio void.
+  ctx.fillStyle = mode === 'reef-health' ? '#071c33' : '#000'
   ctx.fillRect(0, 0, w, h)
 
   // Cache health-driven styles (only changes while scrubbing the slider).
@@ -1012,7 +1047,7 @@ function drawFrame(
     ? (0.18 + 1.05 * health01)
     : (0.22 + 0.92 * (1 - stress01))
 
-  const coralAlpha = 0.92
+  const coralAlpha = 0.98
   const glowT = mode === 'reef-star-growth'
     ? Math.pow(health01, 1.2)
     : Math.max(0, Math.min(1, (health - 74) / 26))
@@ -1220,8 +1255,8 @@ function drawFrame(
     let shrinkReef = shrinkBase
 
     if (mode === 'reef-health') {
-      const startY = REEF_FIELD_COLLAPSE_START_YEAR[reefIndex] ?? 9999
-      const spanY = REEF_FIELD_COLLAPSE_SPAN_YEARS[reefIndex] ?? 6.0
+      const startY = reef.collapseStartYear ?? 9999
+      const spanY = reef.collapseSpanYears ?? 6.0
       const tDie = spanY <= 0 ? 1 : (value - startY) / spanY
       reefLife01 = 1 - easeInOutCubic01(tDie)
       if (reefLife01 <= 0.01) continue
@@ -1232,8 +1267,11 @@ function drawFrame(
       shrinkReef = 0.64 * Math.pow(reefStress01, 1.12)
     }
 
-    const baseFade = mode === 'reef-health' ? Math.max(0.52, 1 - reefIndex * 0.09) : 1
+    const baseFade = mode === 'reef-health' ? (reef.baseFade ?? 0.9) : 1
     const reefFade = baseFade * reefLife01
+    const bleachAmt = mode === 'reef-health'
+      ? Math.max(0, Math.min(1, stress01 * 0.95 + (1 - reefLife01) * 0.55))
+      : 0
 
     let th0 = 0, th1 = 0, th2 = 0, th3 = 0
     let n0 = 0, n1 = 0, n2 = 0, n3 = 0
@@ -1333,6 +1371,25 @@ function drawFrame(
       ctx.strokeStyle = scene.colorCache[group]
       ctx.lineWidth = lineW
       ctx.stroke()
+
+      // Reef Health bleaching: tips whiten first, then the whitening front moves inward.
+      if (mode === 'reef-health' && bleachAmt > 0.04) {
+        const front = Math.max(0.08, Math.min(0.92, 0.80 - 0.58 * bleachAmt + group * 0.02))
+        ctx.beginPath()
+        for (let i = start; i < end; i++) {
+          const tip01 = tip[i]
+          if (tip01 > keepTipReef) continue
+          if (tip01 < front) continue
+          const p = i * 5
+          if (proj[p + 4] <= -1e8) continue
+          ctx.moveTo(proj[p + 0], proj[p + 1])
+          ctx.lineTo(proj[p + 2], proj[p + 3])
+        }
+        ctx.globalAlpha = (0.06 + 0.34 * bleachAmt) * reefFade
+        ctx.strokeStyle = BLEACH_COLOR
+        ctx.lineWidth = lineW * 1.03
+        ctx.stroke()
+      }
     }
   }
 
@@ -1414,7 +1471,7 @@ function drawFrame(
   // Subtle post overlays (ARBORIST: felt, not seen).
   ctx.globalCompositeOperation = 'source-over'
   // Reef Health: reduce vignette so early years don't read as "invisible".
-  ctx.globalAlpha = mode === 'reef-health' ? 0.34 : 1
+  ctx.globalAlpha = mode === 'reef-health' ? 0.24 : 1
   ctx.drawImage(scene.vignetteCanvas, 0, 0)
   ctx.globalAlpha = mode === 'reef-star-growth' ? 0.05 : 0.03
   ctx.globalCompositeOperation = 'soft-light'
@@ -1481,7 +1538,7 @@ export default function CoralReefCanvas({
     canvas.style.cursor = 'grab'
     canvas.style.touchAction = 'none'
 
-    const defaultZoom = mode === 'reef-health' ? 1.85 : 1.12
+    const defaultZoom = mode === 'reef-health' ? 1.55 : 1.12
     zoomRef.current = defaultZoom
     panXRef.current = 0
     panYRef.current = mode === 'reef-health' ? 0 : 0
@@ -1634,21 +1691,22 @@ export default function CoralReefCanvas({
     : { health: growthHealthAtAge(selectedValue) }
   const health = healthSample.health
 
-  const activeEvent = isReefHealth
-    ? (GLOBAL_EVENT_YEARS.find((p) => p.year === selectedValue)?.label ?? null)
-    : (
-      // Reef Star Growth staging notes:
-      // - Inspired by results showing rapid reef growth / functional (carbonate budget) recovery within ~4 years in a
-      //   large-scale Indonesia restoration program: Lange ID et al. (2024) Current Biology.
-      //   DOI: 10.1016/j.cub.2024.02.009
-      selectedValue === 0 ? 'REEF STAR INSTALL'
-        : selectedValue < 6 ? 'FRAGMENTS SECURED'
-          : selectedValue < 12 ? 'EARLY ENCRUSTATION'
-            : selectedValue < 24 ? 'BRANCHING STARTS'
-              : selectedValue < 36 ? 'THICKET BUILDS'
-                : selectedValue < 48 ? 'STAR ENGULFS'
-                  : 'FUNCTIONAL RECOVERY'
-    )
+	  const activeEvent = isReefHealth
+	    ? (GLOBAL_EVENT_YEARS.find((p) => p.year === selectedValue)?.label ?? null)
+	    : (
+	      // Reef Star Growth staging notes:
+	      // - Inspired by results showing rapid reef growth / functional (carbonate budget) recovery within ~4 years in a
+	      //   large-scale Indonesia restoration program: Lange ID et al. (2024) Current Biology.
+	      //   DOI: 10.1016/j.cub.2024.02.009
+	      selectedValue === 0 ? 'REEF STAR INSTALL'
+	        : selectedValue < 6 ? 'FRAGMENTS SECURED'
+	          : selectedValue < 12 ? 'EARLY ENCRUSTATION'
+	            : selectedValue < 24 ? 'BRANCHING STARTS'
+	              : selectedValue < 36 ? 'THICKET BUILDS'
+	                : selectedValue < 54 ? 'STAR ENGULFS'
+	                  : selectedValue < 72 ? 'ECOSYSTEM RETURNS'
+	                    : 'FUNCTIONAL RECOVERY'
+	    )
   const isWarn = isReefHealth ? health < 72 : health < 35
 
   const displayTitle    = title.toUpperCase()
@@ -1657,7 +1715,7 @@ export default function CoralReefCanvas({
   const safeLevel = Math.max(1, Math.min(6, titleLevel)) as 1 | 2 | 3 | 4 | 5 | 6
   const TitleTag  = `h${safeLevel}` as `h${typeof safeLevel}`
   const heroClass = `coral-reef-hero${variant === 'card' ? ' coral-reef-hero--card' : ''}`
-  const defaultZoom = isReefHealth ? 1.85 : 1.12
+  const defaultZoom = isReefHealth ? 1.55 : 1.12
 
   return (
     <section className={heroClass} aria-label={isReefHealth ? 'Reef health viewer' : 'Reef Star Growth viewer'}>
@@ -1712,7 +1770,7 @@ export default function CoralReefCanvas({
             className="crc-slider"
             min={minValue}
             max={maxValue}
-            step={1}
+            step={isReefHealth ? 1 : 2}
             value={selectedValue}
             onChange={e => setSelectedValue(Number(e.target.value))}
             aria-label={isReefHealth ? 'Select year to view reef health' : 'Select months since installation'}
