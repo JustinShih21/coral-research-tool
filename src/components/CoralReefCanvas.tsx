@@ -481,13 +481,6 @@ function generateReefStarFrame(rng: () => number): { frame: LineGeom; ties: Line
     const perpX = -Math.sin(armAng)
     const perpZ =  Math.cos(armAng)
 
-    // Hub-edge point where arm begins
-    const hubEdgeX = outX * HUB_R
-    const hubEdgeZ = outZ * HUB_R
-    // Arm tip
-    const tipX = outX * (HUB_R + ARM_LENGTH)
-    const tipZ = outZ * (HUB_R + ARM_LENGTH)
-
     // Rung positions along the arm (evenly spaced from hub edge to tip)
     const rungPositions: number[] = []
     for (let r = 0; r <= RUNG_COUNT; r++) {
@@ -1887,7 +1880,9 @@ export default function CoralReefCanvas({
         )}
         <StatRow label="COLONIES" value={String(colonyCountRef.current)} />
         <StatRow label="SEGMENTS" value={String(segCountRef.current)} />
-        {activeEvent && <StatRow label="STATUS" value={isReefHealth ? 'BLEACHING' : 'GROWTH'} warn={isWarn} />}
+        {activeEvent && (
+          <StatRow label="STATUS" value={activeEvent.toUpperCase()} warn={isWarn} />
+        )}
       </aside>
 
       {/* ── Scrubber — bottom ──────────────────────────────────── */}
