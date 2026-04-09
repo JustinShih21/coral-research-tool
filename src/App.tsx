@@ -19,6 +19,10 @@ const LeonLivingSeasBriefing = lazy(() => import('./pages/LeonLivingSeasBriefing
 const TeamPage = lazy(() => import('./pages/TeamPage'))
 const TeamMemberPage = lazy(() => import('./pages/TeamMemberPage'))
 const TeamManagePage = lazy(() => import('./pages/TeamManagePage'))
+const CoralImpactHubPage = lazy(() => import('./pages/CoralImpactHubPage'))
+const CoralImpactEconomyPage = lazy(() => import('./pages/CoralImpactEconomyPage'))
+const CoralImpactMarineLifePage = lazy(() => import('./pages/CoralImpactMarineLifePage'))
+const CoralImpactPlanetPage = lazy(() => import('./pages/CoralImpactPlanetPage'))
 
 function PageLoading() {
   return <div className="page-loading">Loading…</div>
@@ -29,6 +33,13 @@ export default function App() {
     <AuthProvider>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/coral-impact" element={<Suspense fallback={<PageLoading />}><CoralImpactHubPage /></Suspense>} />
+        <Route path="/economy" element={<Suspense fallback={<PageLoading />}><CoralImpactEconomyPage /></Suspense>} />
+        <Route path="/marine-life" element={<Suspense fallback={<PageLoading />}><CoralImpactMarineLifePage /></Suspense>} />
+        <Route path="/planet" element={<Suspense fallback={<PageLoading />}><CoralImpactPlanetPage /></Suspense>} />
+        <Route path="/coral-impact/economy" element={<Navigate to="/economy" replace />} />
+        <Route path="/coral-impact/marine-life" element={<Navigate to="/marine-life" replace />} />
+        <Route path="/coral-impact/planet" element={<Navigate to="/planet" replace />} />
         <Route path="/*" element={
           <Layout>
             <Routes>

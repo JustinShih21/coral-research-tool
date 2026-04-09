@@ -13,7 +13,8 @@ export default function Layout({ children }: { children?: React.ReactNode }) {
 
   const publicNav = [
     { to: '/', label: 'Home' },
-    { to: '/reef-health', label: 'Reef Health' },
+    { to: '/coral-impact', label: 'Coral Impact' },
+    { to: '/reef-health', label: 'Restore the Reefs' },
     { to: '/team', label: 'Meet the team' },
     { to: '/donate', label: 'Donate' },
     { to: '/library', label: 'Research Library' },
@@ -22,7 +23,8 @@ export default function Layout({ children }: { children?: React.ReactNode }) {
 
   const fullNav = [
     { to: '/', label: 'Home' },
-    { to: '/reef-health', label: 'Reef Health' },
+    { to: '/coral-impact', label: 'Coral Impact' },
+    { to: '/reef-health', label: 'Restore the Reefs' },
     { to: '/team', label: 'Meet the team' },
     { to: '/donate', label: 'Donate' },
     { to: '/library', label: 'Research Library' },
