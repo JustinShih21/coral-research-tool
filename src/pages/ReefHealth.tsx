@@ -7,14 +7,14 @@ export default function ReefHealth() {
   const [tab, setTab] = useState<ReefHealthTab>('reef-health')
 
   const isHealth = tab === 'reef-health'
-  const title = isHealth ? 'Reef Health' : 'Reef Star Growth'
+  const title = 'Restore the Reefs'
   const subtitle = isHealth
     ? 'Global hard coral cover · GCRMN · NOAA CRW'
     : 'MARRS Reef Stars · months since installation'
 
   return (
     <div className="reef-health-page">
-      <div className="reef-health-tabs" role="tablist" aria-label="Reef health modes">
+      <div className="reef-health-tabs" role="tablist" aria-label="Restore the Reefs modes">
         <button
           type="button"
           role="tab"
@@ -22,7 +22,7 @@ export default function ReefHealth() {
           aria-selected={isHealth}
           onClick={() => setTab('reef-health')}
         >
-          Reef Health
+          Restore the Reefs
         </button>
         <button
           type="button"
@@ -31,7 +31,7 @@ export default function ReefHealth() {
           aria-selected={!isHealth}
           onClick={() => setTab('reef-star-growth')}
         >
-          Reef Star Growth
+          Restore the Reefs Growth
         </button>
       </div>
 

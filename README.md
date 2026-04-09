@@ -46,9 +46,14 @@ Output is in `dist/`.
 ## Vercel deployment
 
 Set environment variables in the Vercel project: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Ensure the `research_data` table exists in Supabase (run `supabase-schema.sql`).
+This repo includes `vercel.json` with a SPA rewrite so deep links and page reloads on routes like `/donate` do not return 404.
 
 Optional donation configuration:
-- `VITE_DONATION_URL` — external donation processor URL (Stripe payment link, Givebutter, Donorbox, etc.); the app appends `amount` and `frequency` query params (existing query params on the URL are preserved).
+- `VITE_DONATION_URL` — primary checkout URL (Stripe Payment Link, Givebutter, Donorbox, etc.).
+- `VITE_DONATION_URL_MONTHLY` / `VITE_DONATION_URL_ONETIME` — optional separate links when monthly and one-time use different Stripe products or pages.
+- **Query params:** For **Stripe** hosts (`stripe.com`), the app sets `prefilled_amount` in **cents** (USD). For other hosts it appends `amount` (dollars) and `frequency` (`monthly` | `one-time`). Set `VITE_DONATION_FORCE_GENERIC_PARAMS=true` to always use `amount` + `frequency` instead.
 - `VITE_DONATION_EMAIL` — fallback email address for pledge flow when `VITE_DONATION_URL` is not set.
-- `VITE_DONATION_PROCESSOR_LABEL` — short name shown on `/donate` (e.g. `Stripe`) so donors know which checkout they are entering.
+- `VITE_DONATION_PROCESSOR_LABEL` — short name shown on `/donate` (e.g. `Stripe`).
 - `VITE_DONATION_SUPPORT_EMAIL` — optional; used in FAQ copy and the contact line. Defaults to `VITE_DONATION_EMAIL`.
+
+**Stripe quick path:** Create a [Payment Link](https://dashboard.stripe.com/payment-links) with customer-chosen or preset amounts, paste the URL into `VITE_DONATION_URL`, set `VITE_DONATION_PROCESSOR_LABEL=Stripe`, deploy. For recurring vs one-time, create two links and set `VITE_DONATION_URL_MONTHLY` and `VITE_DONATION_URL_ONETIME`.

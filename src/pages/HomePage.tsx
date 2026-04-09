@@ -85,7 +85,7 @@ export default function HomePage() {
           </p>
           <div className="home-hero-actions">
             <Link to="/donate" className="button-primary">Fund Restoration</Link>
-            <Link to="/reef-health" className="button-secondary">Explore Reef Health</Link>
+            <Link to="/reef-health" className="button-secondary">Restore the Reefs</Link>
           </div>
           <div className="home-hero-metrics" role="list" aria-label="Impact snapshot">
             <article role="listitem">

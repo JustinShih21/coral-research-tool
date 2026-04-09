@@ -1,8 +1,18 @@
 import { useMemo, useState } from 'react'
+import { buildDonationCheckoutUrl, resolveDonationBaseUrl } from '@/lib/donationCheckoutUrl'
 
-const SUGGESTED_AMOUNTS = [35, 75, 150, 300] as const
-/** Preset we highlight as a social-norm anchor (matches default selection). */
+const SUGGESTED_AMOUNTS = [35, 75, 150, 300, 500] as const
 const POPULAR_PRESET_AMOUNT = 75
+
+/** Hero visual — coral reef (Unsplash); replace with /images/... when you host your own photo. */
+const DONATE_HERO_IMAGE =
+  'https://images.unsplash.com/photo-1572713629470-3e9f5d4fdf4c?auto=format&fit=crop&w=1600&q=80'
+
+const PARTNER_PILLS = [
+  { label: 'USC Marshall field program' },
+  { label: 'Indonesia reef teams' },
+  { label: 'Transparent field reporting' },
+] as const
 
 function buildDonationFaqs(supportEmail: string) {
   return [
@@ -49,6 +59,24 @@ function formatUsd(value: number): string {
   }).format(value)
 }
 
+function annualFromPreset(amount: number, frequency: 'monthly' | 'one-time'): number {
+  return frequency === 'monthly' ? amount * 12 : amount
+}
+
+function impactFromAnnual(annualValue: number) {
+  return {
+    fragments: Math.round(annualValue * 1.8),
+    stewardMonths: Math.max(1, Math.round(annualValue / 125)),
+    monitoringTrips: Math.max(1, Math.round(annualValue / 280)),
+  }
+}
+
+function presetImpactSummary(amount: number, frequency: 'monthly' | 'one-time'): string {
+  const annual = annualFromPreset(amount, frequency)
+  const { fragments } = impactFromAnnual(annual)
+  return `~${fragments.toLocaleString()} fragments/yr equiv.`
+}
+
 export default function DonationPage() {
   const [frequency, setFrequency] = useState<'monthly' | 'one-time'>('monthly')
   const [selectedAmount, setSelectedAmount] = useState<number>(POPULAR_PRESET_AMOUNT)
@@ -61,6 +89,10 @@ export default function DonationPage() {
 
   const configuredDonationUrl =
     (import.meta.env.VITE_DONATION_URL as string | undefined)?.trim() || ''
+  const configuredDonationUrlMonthly =
+    (import.meta.env.VITE_DONATION_URL_MONTHLY as string | undefined)?.trim() || ''
+  const configuredDonationUrlOnetime =
+    (import.meta.env.VITE_DONATION_URL_ONETIME as string | undefined)?.trim() || ''
   const configuredDonationEmail =
     (import.meta.env.VITE_DONATION_EMAIL as string | undefined)?.trim() || 'donations@coralresearchinitiative.org'
   const supportEmail =
@@ -69,25 +101,24 @@ export default function DonationPage() {
 
   const faqs = useMemo(() => buildDonationFaqs(supportEmail), [supportEmail])
 
-  const impact = useMemo(() => {
-    return {
-      fragments: Math.round(annualValue * 1.8),
-      stewardMonths: Math.max(1, Math.round(annualValue / 125)),
-      monitoringTrips: Math.max(1, Math.round(annualValue / 280)),
-    }
-  }, [annualValue])
+  const impact = useMemo(() => impactFromAnnual(annualValue), [annualValue])
 
   const donationUrl = useMemo(() => {
-    if (!configuredDonationUrl) return ''
-    try {
-      const url = new URL(configuredDonationUrl)
-      url.searchParams.set('amount', String(donationAmount))
-      url.searchParams.set('frequency', frequency)
-      return url.toString()
-    } catch {
-      return configuredDonationUrl
-    }
-  }, [configuredDonationUrl, donationAmount, frequency])
+    const base = resolveDonationBaseUrl(
+      frequency,
+      configuredDonationUrl,
+      configuredDonationUrlMonthly || undefined,
+      configuredDonationUrlOnetime || undefined
+    )
+    if (!base) return ''
+    return buildDonationCheckoutUrl(base, donationAmount, frequency)
+  }, [
+    configuredDonationUrl,
+    configuredDonationUrlMonthly,
+    configuredDonationUrlOnetime,
+    donationAmount,
+    frequency,
+  ])
 
   const fallbackMailto = `mailto:${encodeURIComponent(configuredDonationEmail)}?subject=${encodeURIComponent(
     `Donation pledge: ${formatUsd(donationAmount)} ${frequency}`
@@ -96,29 +127,36 @@ export default function DonationPage() {
 
   return (
     <div className="donation-page">
-      <section className="donation-hero">
-        <div>
+      <section className="donation-hero donation-hero-with-media">
+        <figure className="donation-hero-media">
+          <img
+            src={DONATE_HERO_IMAGE}
+            alt="Healthy coral reef underwater—restoration work protects habitats like this."
+            width={800}
+            height={520}
+            loading="eager"
+            decoding="async"
+          />
+        </figure>
+        <div className="donation-hero-copy">
           <p className="donation-kicker">Fund reef restoration</p>
-          <h1>Help scale coral recovery—with clear, measurable impact.</h1>
+          <h1>Every gift grows living reef—where communities lead the work.</h1>
           <p>
-            Monthly gifts keep nurseries and monitoring funded year-round. Choose an amount to see estimated field
-            impact, then complete your gift through our secure checkout.
+            Your support helps keep nurseries stocked, stewards paid, and monitoring honest. Pick a monthly or
+            one-time amount, see what it can unlock in the field, then finish on secure checkout.
           </p>
         </div>
-        <aside className="donation-proof" aria-label="Why donors trust this program">
-          <article>
-            <strong>Transparent reporting</strong>
-            <p>Program updates cover outplant totals, survival checks, and how resources reach the water.</p>
-          </article>
-          <article>
-            <strong>Community-first operations</strong>
-            <p>Local operators and dive teams are prioritized in how field work is resourced.</p>
-          </article>
-          <article>
-            <strong>Outcomes, not optics</strong>
-            <p>Funding decisions are tied to ecological milestones and operational realities on the reef.</p>
-          </article>
-        </aside>
+      </section>
+
+      <section className="donation-social-proof" aria-label="Partners and credibility">
+        <p className="donation-social-lead">Backed by university research and in-water partners across Indonesia.</p>
+        <div className="donation-partner-pills" role="list">
+          {PARTNER_PILLS.map((p) => (
+            <span key={p.label} className="donation-partner-pill" role="listitem">
+              {p.label}
+            </span>
+          ))}
+        </div>
       </section>
 
       <section className="donation-builder">
@@ -160,6 +198,7 @@ export default function DonationPage() {
                 {amount === POPULAR_PRESET_AMOUNT && (
                   <span className="donation-amt-popular">Popular</span>
                 )}
+                <span className="donation-amt-hint">{presetImpactSummary(amount, frequency)}</span>
               </button>
             ))}
           </div>
@@ -176,12 +215,20 @@ export default function DonationPage() {
           <a className="donation-submit" href={primaryHref}>
             Continue to secure donation
           </a>
+          <p className="donation-secure-line">
+            <span className="donation-secure-icon" aria-hidden>
+              🔒
+            </span>
+            Encrypted checkout{processorLabel ? ` · ${processorLabel}` : ''}
+          </p>
           <p className="donation-note">
             {donationUrl
               ? `You will leave this site to complete payment${
                   processorLabel ? ` with ${processorLabel}` : ' on our processor'
-                }. Your amount and frequency are passed to checkout.`
-              : 'Checkout is not configured yet—this button opens an email pledge with your amount and frequency.'}
+                }. Your amount is sent to checkout${
+                  frequency === 'monthly' ? ' (choose the monthly option on the next page if prompted).' : '.'
+                }`
+              : 'Add a payment link in your site settings (e.g. Stripe Payment Link)—until then this button opens an email pledge with your amount and frequency.'}
           </p>
           <div className="donation-trust-foot">
             <p>
@@ -202,26 +249,22 @@ export default function DonationPage() {
             <article>
               <strong>{impact.fragments}</strong>
               <span>Coral fragments prepared annually</span>
+              <span className="donation-impact-hint">
+                Illustrative equivalent based on program cost benchmarks—not a guarantee of a single outcome.
+              </span>
             </article>
             <article>
               <strong>{impact.stewardMonths}</strong>
               <span>Steward work-months funded</span>
+              <span className="donation-impact-hint">Roughly one funded month per ~$125 directed to stipends.</span>
             </article>
             <article>
               <strong>{impact.monitoringTrips}</strong>
               <span>Monitoring dive trips covered</span>
+              <span className="donation-impact-hint">Roughly one trip per ~$280 in dive logistics.</span>
             </article>
           </div>
         </aside>
-      </section>
-
-      <section className="donation-pillars" aria-label="Program focus">
-        <h2 className="donation-pillars-heading">What your gift supports</h2>
-        <ul className="donation-pillars-list">
-          <li>Restoration finance and bankable reef projects</li>
-          <li>Indonesia field partnerships and local capacity</li>
-          <li>Reporting donors can trust</li>
-        </ul>
       </section>
 
       <section className="donation-faq">
@@ -240,6 +283,15 @@ export default function DonationPage() {
             </article>
           ))}
         </div>
+      </section>
+
+      <section className="donation-pillars" aria-label="Program focus">
+        <h2 className="donation-pillars-heading">What your gift supports</h2>
+        <ul className="donation-pillars-list">
+          <li>Restoration finance and bankable reef projects</li>
+          <li>Indonesia field partnerships and local capacity</li>
+          <li>Reporting donors can trust</li>
+        </ul>
       </section>
 
       <div className="donation-sticky-give">
