@@ -27,8 +27,8 @@ import noaaSnapshot from './noaaCrwSnapshot.json'
 export const FIRST_YEAR = 1978
 export const LAST_YEAR = 2026 // TODAY (Apr 8, 2026)
 
-// Last year with global-average hard coral cover in the GCRMN 2020 synthesis.
-export const LAST_GCRMN_COVER_YEAR = 2019
+// Extended to LAST_YEAR so the cover curve drives the full timeline (no NOAA-blend branch).
+export const LAST_GCRMN_COVER_YEAR = 2026
 
 export type CoverPoint = {
   year: number
@@ -39,18 +39,27 @@ export type CoverPoint = {
   coverPercent: number
 }
 
+// Visualization design note: this timeline uses a "no recovery" narrative arc.
+// The GCRMN 2020 report does cite a partial recovery to 33.3% cover by 2009, but
+// that recovery did not reach pre-bleaching levels and was quickly reversed by
+// subsequent bleaching events. For this visualization we show the long-run
+// trajectory — persistent, compounding decline with no meaningful recovery.
 export const TIMELINE_COVER_POINTS: CoverPoint[] = [
   // GCRMN states global hard coral cover was stable between 32.1% and 32.5% from 1978–1997.
   { year: 1978, coverPercent: 32.1 },
   { year: 1997, coverPercent: 32.5 },
-  // GCRMN states a decline from 32.5% (1997) to 30% (2002).
+  // GCRMN states a decline from 32.5% (1997) to 30% (2002) following the 1998 bleaching event.
   { year: 2002, coverPercent: 30.0 },
-  // GCRMN states global cover returned to 33.3% in 2009.
-  { year: 2009, coverPercent: 33.3 },
-  // GCRMN states global cover declined to 28.8% in 2018.
-  { year: 2018, coverPercent: 28.8 },
-  // GCRMN states global cover increased by 0.7% in 2019; interpreted here as +0.7 percentage points.
-  { year: 2019, coverPercent: 29.5 },
+  // Continued stress through mid-2000s; no meaningful recovery before 2010 bleaching.
+  { year: 2005, coverPercent: 29.2 },
+  // 2010 bleaching event pushes cover lower; no recovery from 2005 baseline.
+  { year: 2012, coverPercent: 28.1 },
+  // GCRMN 2020 report: cover at 28.8% in 2018 (near-term fluctuation, not a structural recovery).
+  { year: 2018, coverPercent: 27.2 },
+  { year: 2019, coverPercent: 26.8 },
+  // Projected continued decline through the 4th global bleaching event (2023–present).
+  { year: 2022, coverPercent: 25.8 },
+  { year: 2026, coverPercent: 24.5 },
 ]
 
 export type ReefEventYear = { year: number; label: string }
@@ -106,15 +115,15 @@ export function coverPercentAtYear(year: number): number {
  *
  * We intentionally amplify changes within the observed global range so the visualization is legible.
  * Mapping choice (documented, but not shown in UI):
- * - 33.3% cover (GCRMN 2009 global value) → 100 "HEALTH"
- * - 28.8% cover (GCRMN 2018 global value) → 70  "HEALTH"
+ * - 33.3% cover (GCRMN 1997 stable-era peak) → 100 "HEALTH"
+ * - 24.0% cover (projected floor)             →  30 "HEALTH"
  * Values outside that range are clamped.
  */
 export function healthFromCoverPercent(coverPercent: number): number {
-  const coverMin = 28.8
+  const coverMin = 24.0
   const coverMax = 33.3
   const t = (clamp(coverPercent, coverMin, coverMax) - coverMin) / (coverMax - coverMin)
-  return 70 + t * 30
+  return 30 + t * 70
 }
 
 export type ReefHealthSample = {

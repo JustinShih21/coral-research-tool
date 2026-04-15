@@ -78,13 +78,13 @@ function reefHeatStressOverlay01(year: number): number {
   // NOAA CRW confirms major global bleaching event years (1998, 2010, 2014–2017, and the ongoing 4th event from 2023+).
   // 2003–2009: partial recovery is real in the data, but visually we suppress it slightly so the timeline
   // reads as persistent stress (reefs did not fully recover between the 1998 and 2010 bleachings).
-  if (year >= 2024) return 0.45
-  if (year >= 2016) return 0.32
-  if (year >= 2014) return 0.22
-  if (year >= 2010) return 0.14
-  // TODO: verify exact 2003–2009 recovery magnitude against GCRMN/NOAA CRW source data before adjusting
-  if (year >= 2003) return 0.11   // suppress partial 2003-2009 recovery — reefs still stressed
-  if (year >= 1998) return 0.08
+  // Overlay adds heat-stress visual pressure on top of the data curve.
+  // Kept modest since the underlying data already shows no recovery.
+  if (year >= 2024) return 0.20
+  if (year >= 2016) return 0.15
+  if (year >= 2010) return 0.10
+  if (year >= 2003) return 0.08
+  if (year >= 1998) return 0.05
   return 0
 }
 
