@@ -76,10 +76,14 @@ function reefHeatStressOverlay01(year: number): number {
   // We intensify stress during NOAA/GCRMN-linked global bleaching periods so the reef can visibly deteriorate,
   // even when the underlying monitored global-cover series changes slowly.
   // NOAA CRW confirms major global bleaching event years (1998, 2010, 2014–2017, and the ongoing 4th event from 2023+).
+  // 2003–2009: partial recovery is real in the data, but visually we suppress it slightly so the timeline
+  // reads as persistent stress (reefs did not fully recover between the 1998 and 2010 bleachings).
   if (year >= 2024) return 0.45
   if (year >= 2016) return 0.32
   if (year >= 2014) return 0.22
   if (year >= 2010) return 0.14
+  // TODO: verify exact 2003–2009 recovery magnitude against GCRMN/NOAA CRW source data before adjusting
+  if (year >= 2003) return 0.11   // suppress partial 2003-2009 recovery — reefs still stressed
   if (year >= 1998) return 0.08
   return 0
 }
@@ -94,14 +98,17 @@ function reefHealthVisualAtYear(year: number): { health: number; noaaAsOfDate?: 
 // ─── Scene constants ──────────────────────────────────────────────────────────
 
 const TAU         = Math.PI * 2
-const BOMMIE_R    = 115   // hemisphere radius (world units)
-const BRANCH_LEN  = 64    // initial trunk length per colony (world units)
+const BOMMIE_R    = 148   // hemisphere radius (world units) — larger for bottom-half fill
+const BRANCH_LEN  = 95    // initial trunk length per colony (world units)
 const FOV         = 600   // perspective focal length
 const STATIC_ROT_Y_HEALTH = 0
 const STATIC_ROT_Y_STAR = 0.56
 
 const HEALTHY_COLORS = ['#ff6b9e', '#ff8c42', '#00c9a7', '#c77dff'] as const
 const BLEACH_COLOR   = '#ddd8cc'
+
+// Coral morphology types for shape diversity
+type CoralMorphology = 'branching' | 'massive' | 'table' | 'encrusting'
 
 // ─── Vec3 math ────────────────────────────────────────────────────────────────
 
@@ -210,7 +217,7 @@ interface Scene {
   colonyCount: number
   segmentsTotal: number
 
-  // Fish params (orbit order): [rx, rz, y, phase, speed, bodyLen, bodyH, colorIndex] × 12
+  // Fish params (orbit order): [rx, rz, y, phase, speed, bodyLen, bodyH, colorIndex, shapeType, _pad, _pad, _pad] × 20
   fish: Float32Array
   fishCount: number
 
@@ -231,6 +238,10 @@ interface Scene {
   reefStarFrame?: LineGeom
   reefStarTies?: LineGeom
   reefStarFragments?: LineGeom
+
+  // Environment: floating particles (plankton) and caustic light seeds
+  particles: Float32Array    // 45 × 4: [x, y, speed, phase]
+  causticsSeeds: Float32Array  // 7 phase offsets for seafloor caustic blobs
 
   frame: number
   w: number
@@ -301,7 +312,8 @@ function generateReefGeom(
   scale: number,
   colonyLayout: Array<{ phi: number; alpha: number }>,
   rng: () => number,
-  meta?: { collapseStartYear?: number; collapseSpanYears?: number; baseFade?: number }
+  meta?: { collapseStartYear?: number; collapseSpanYears?: number; baseFade?: number },
+  morphology?: CoralMorphology
 ): { reef: ReefGeom; colonies: number } {
   const branchesByColor: number[][] = [[], [], [], []]
   const tipByColor: number[][] = [[], [], [], []]
@@ -322,34 +334,58 @@ function generateReefGeom(
     const origin: Vec3 = v3.add(offset, local)
     const normal = v3.norm(local)
 
-    // Apex colonies grow mostly vertical; base colonies lean outward
-    const blend  = phi < 45 ? 0.52 : 0.72
+    // Morphology-driven growth parameters
+    const morph = morphology ?? 'branching'
+
+    let spreadRad: number, baseDepth: number, baseThick: number, baseLen: number, growBlend: number
+
+    if (morph === 'branching') {
+      // Staghorn: thin, tall, tight spread
+      spreadRad = (28 + rng() * 14) * Math.PI / 180
+      baseDepth = phi < 42 ? 5 : 4
+      baseThick = (3.6 + rng() * 0.8) * scale
+      baseLen   = branchLen * (0.80 + rng() * 0.22)
+      growBlend = phi < 45 ? 0.48 : 0.65
+    } else if (morph === 'massive') {
+      // Brain/boulder: thick, short, very wide spread — forms rounded mound
+      spreadRad = (52 + rng() * 12) * Math.PI / 180
+      baseDepth = 3
+      baseThick = (8.0 + rng() * 2.8) * scale
+      baseLen   = branchLen * (0.40 + rng() * 0.12)
+      growBlend = 0.55   // grow slightly outward to make a mound
+    } else if (morph === 'table') {
+      // Table/plate: wide, flat, mostly horizontal growth
+      spreadRad = (68 + rng() * 10) * Math.PI / 180
+      baseDepth = 3
+      baseThick = (5.5 + rng() * 1.5) * scale
+      baseLen   = branchLen * (0.55 + rng() * 0.15)
+      growBlend = 0.85   // lean strongly outward for flat profile
+    } else {
+      // Encrusting: very short, very wide, blob-like
+      spreadRad = (78 + rng() * 10) * Math.PI / 180
+      baseDepth = 2
+      baseThick = (10.0 + rng() * 3.0) * scale
+      baseLen   = branchLen * (0.28 + rng() * 0.10)
+      growBlend = 0.92   // nearly horizontal
+    }
+
     const growDir = v3.norm({
-      x: normal.x * blend + UP.x * (1 - blend),
-      y: normal.y * blend + UP.y * (1 - blend),
-      z: normal.z * blend + UP.z * (1 - blend),
+      x: normal.x * growBlend + UP.x * (1 - growBlend),
+      y: normal.y * growBlend + UP.y * (1 - growBlend),
+      z: normal.z * growBlend + UP.z * (1 - growBlend),
     })
 
-    // Build a *thicket* per colony (multiple primary stems) so the scene reads as many colonies,
-    // not a couple of long "sticks" pointing at the viewer.
-    const spreadRad = phi < 42
-      ? (30 + rng() * 10)  * Math.PI / 180
-      : (38 + rng() * 14) * Math.PI / 180
-
-    const baseDepth = phi < 42 ? 4 : 3
-    const baseThick = (4.2 + rng() * 1.0) * scale
-    const baseLen = branchLen * (0.72 + rng() * 0.18)
     const perp = randPerp(rng, growDir)
     const fan = spreadRad * (0.55 + rng() * 0.25)
 
-    const d1 = v3.norm(v3.rotAround(growDir, perp, fan))
+    const d1 = v3.norm(v3.rotAround(growDir, perp,  fan))
     const d2 = v3.norm(v3.rotAround(growDir, perp, -fan))
     const d3 = v3.norm(v3.rotAround(growDir, normal, (rng() - 0.5) * 1.0))
 
     buildBranches3D(origin, d1, baseLen, baseThick * 0.78, baseDepth, baseDepth, spreadRad, i % 4, branchesByColor, tipByColor, rng)
     buildBranches3D(origin, d2, baseLen, baseThick * 0.78, baseDepth, baseDepth, spreadRad, (i + 1) % 4, branchesByColor, tipByColor, rng)
-    if (i === 0 || (rng() > 0.55 && phi > 45)) {
-      buildBranches3D(origin, d3, baseLen * 0.92, baseThick * 0.70, Math.max(2, baseDepth - 1), baseDepth, spreadRad, (i + 2) % 4, branchesByColor, tipByColor, rng)
+    if (i === 0 || (rng() > 0.45 && phi > 40)) {
+      buildBranches3D(origin, d3, baseLen * 0.92, baseThick * 0.72, Math.max(2, baseDepth - 1), baseDepth, spreadRad, (i + 2) % 4, branchesByColor, tipByColor, rng)
     }
   })
 
@@ -402,225 +438,198 @@ function generateLinesGeom(segments: number[]): LineGeom {
   return { geom, proj }
 }
 
-function generateReefStarFrame(rng: () => number): { frame: LineGeom; ties: LineGeom; fragments: LineGeom; anchors: Vec3[] } {
-  // MARRS Reef Star — accurate 3D representation:
-  // 6 arms at 60° intervals from a central hexagonal hub.
-  // Each arm = two parallel rails + RUNG_COUNT perpendicular cross-bar rungs (ladder structure).
-  // Extremely flat profile (~12 units vertical). Coral fragment plugs at each rung×rail intersection.
-  //
-  // Top-view of one arm:
-  //   hub |--rung--|--rung--|--rung--|--rung--| tip-cap
-  //        rail_L                               rail_L
-  //        rail_R                               rail_R
+function generateReefStarFrame(_rng: () => number): { frame: LineGeom; ties: LineGeom; fragments: LineGeom; anchors: Vec3[] } {
+  // MARRS Reef Star — clean dome/umbrella, simplified to core structural members only:
+  // - Elevated APEX at top center
+  // - 6 primary RIBS apex → hex ring (no secondary/apex triangulation)
+  // - HEXAGONAL RING (two planes: high + low, no panel diagonals)
+  // - Vertical STIFFENERS at each hex vertex
+  // - 6 LEGS splaying from lower ring → ground contacts (no cross-braces)
 
-  const ARM_LENGTH  = 210   // hub-edge to arm tip (world units)
-  const ARM_WIDTH   = 30    // spacing between the two parallel rails
-  const RUNG_COUNT  = 4     // cross-bars per arm
-  const HUB_R       = 38    // central hexagon circumradius
-  const LOW_Y       = -52   // bottom plane Y
-  const HIGH_Y      = -40   // top plane Y (~12 units thick)
-  const LEG_Y       = -68   // ground-leg bottom
+  const APEX_Y    = 115   // higher for more visible dome profile from camera angle
+  const HEX_R     = 170
+  const HEX_Y     =  -8
+  const HEX_LOW_Y = -20
+  const LEG_TIP_R = 255
+  const LEG_Y     = -85
+
+  const apex: Vec3 = { x: 0, y: APEX_Y, z: 0 }
+
+  function lerpVec(a: Vec3, b: Vec3, t: number): Vec3 {
+    return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t }
+  }
+
+  const hexHigh: Vec3[] = []
+  const hexLow:  Vec3[] = []
+  const legTips: Vec3[] = []
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * TAU
+    const x = Math.cos(a) * HEX_R
+    const z = Math.sin(a) * HEX_R
+    hexHigh.push({ x, y: HEX_Y,     z })
+    hexLow.push({  x, y: HEX_LOW_Y, z })
+    legTips.push({ x: Math.cos(a) * LEG_TIP_R, y: LEG_Y, z: Math.sin(a) * LEG_TIP_R })
+  }
 
   const segs: number[] = []
-  const ties: number[] = []
-  const fragments: number[] = []
   const anchors: Vec3[] = []
 
   function addSeg(a: Vec3, b: Vec3, thick: number) {
     segs.push(a.x, a.y, a.z, b.x, b.y, b.z, thick)
   }
-  function addTie(p: Vec3, perpX: number, perpZ: number, thick: number) {
-    const len = 9 + rng() * 5
-    ties.push(
-      p.x - perpX * len, HIGH_Y + 1.5, p.z - perpZ * len,
-      p.x + perpX * len, HIGH_Y + 1.5, p.z + perpZ * len,
-      thick
-    )
-  }
-  function addFragment(p: Vec3, outX: number, outZ: number, thick: number) {
-    const len = 9 + rng() * 6
-    const dir = v3.norm({ x: outX * 0.18, y: 1, z: outZ * 0.18 })
-    fragments.push(
-      p.x, p.y, p.z,
-      p.x + dir.x * len, p.y + dir.y * len, p.z + dir.z * len,
-      thick
-    )
-  }
 
-  // ─── Central hexagonal hub ──────────────────────────────────────────────────
-  const hubLow: Vec3[]  = []
-  const hubHigh: Vec3[] = []
+  // ─── 6 primary ribs: apex → hex ring ─────────────────────────────────────
   for (let i = 0; i < 6; i++) {
-    const a = (i / 6) * TAU
-    const x = Math.cos(a) * HUB_R
-    const z = Math.sin(a) * HUB_R
-    hubLow.push({ x, y: LOW_Y, z })
-    hubHigh.push({ x, y: HIGH_Y, z })
+    addSeg(apex, hexHigh[i], 5.5)
   }
+
+  // ─── Hex ring (two planes) + vertical stiffener at each vertex ───────────
   for (let i = 0; i < 6; i++) {
-    addSeg(hubLow[i],  hubLow[(i + 1) % 6],  2.2)
-    addSeg(hubHigh[i], hubHigh[(i + 1) % 6], 1.9)
-    addSeg(hubLow[i],  hubHigh[i],            1.4)
+    const next = (i + 1) % 6
+    addSeg(hexHigh[i], hexHigh[next], 4.0)   // upper ring
+    addSeg(hexLow[i],  hexLow[next],  3.0)   // lower ring
+    addSeg(hexHigh[i], hexLow[i],     2.2)   // vertical stiffener
   }
-  // Hub center pillar
-  const hubCenterLow:  Vec3 = { x: 0, y: LOW_Y,  z: 0 }
-  const hubCenterHigh: Vec3 = { x: 0, y: HIGH_Y, z: 0 }
+
+  // ─── 6 legs: lower ring → ground splay ──────────────────────────────────
   for (let i = 0; i < 6; i++) {
-    addSeg(hubLow[i],  hubCenterLow,  1.1)
-    addSeg(hubHigh[i], hubCenterHigh, 1.0)
+    addSeg(hexLow[i], legTips[i], 3.2)
   }
-  addSeg(hubCenterLow, hubCenterHigh, 1.3)
 
-  // ─── 6 Arms ─────────────────────────────────────────────────────────────────
-  for (let arm = 0; arm < 6; arm++) {
-    const armAng = (arm / 6) * TAU   // 0°, 60°, 120°, …
-    // Outward axis (arm direction)
-    const outX = Math.cos(armAng)
-    const outZ = Math.sin(armAng)
-    // Perpendicular axis (rail offset direction, in XZ plane)
-    const perpX = -Math.sin(armAng)
-    const perpZ =  Math.cos(armAng)
+  // ─── Coral fragment anchors (no visual ties/fragments — just positions) ──
+  for (let i = 0; i < 6; i++) {
+    for (const t of [0.40, 0.65, 0.85]) {
+      anchors.push(lerpVec(apex, hexHigh[i], t))
+    }
+    anchors.push({ ...hexHigh[i], y: hexHigh[i].y + 2 })
+  }
+  anchors.push({ x: 0, y: APEX_Y + 3, z: 0 })
 
-    // Rung positions along the arm (evenly spaced from hub edge to tip)
-    const rungPositions: number[] = []
-    for (let r = 0; r <= RUNG_COUNT; r++) {
-      const t = r / RUNG_COUNT
-      rungPositions.push(HUB_R + t * ARM_LENGTH)
+  return {
+    frame: generateLinesGeom(segs),
+    ties: generateLinesGeom([]),
+    fragments: generateLinesGeom([]),
+    anchors,
+  }
+}
+
+function generateCoralFromAnchors(anchors: Vec3[], rng: () => number): { reef: ReefGeom; colonies: number } {
+  // Per-anchor variation arrays (seeded, deterministic)
+  const anchorMorphs: CoralMorphology[] = anchors.map(() => {
+    // Weighted mix: ~45% branching, 25% massive, 20% table, 10% encrusting
+    const r = rng()
+    if (r < 0.45) return 'branching'
+    if (r < 0.70) return 'massive'
+    if (r < 0.90) return 'table'
+    return 'encrusting'
+  })
+  // Speed offsets: 0.0 (fast) → 0.45 (slow) — baked into tip values as a multiplier
+  // tip * (1 + speedOffset) means slow anchors need higher keepTip01 to reveal
+  const anchorSpeedOffset: number[] = anchors.map(() => rng() * 0.45)
+  // Size multiplier: 0.55 → 1.75 (competition effect)
+  const anchorSize: number[] = anchors.map(() => 0.55 + rng() * 1.2)
+  // Direction bias: 0 = mostly vertical, 1 = mostly lateral (outward)
+  const anchorBias: number[] = anchors.map(() => rng())
+
+  // We need per-color tip tracking tied to anchor index so we can apply speed offsets
+  // Use a flat accumulator per anchor, then merge into color buckets afterward
+  const allSegs: Array<{ x1:number; y1:number; z1:number; x2:number; y2:number; z2:number; thick:number; color:number; tip:number }> = []
+
+  for (let i = 0; i < anchors.length; i++) {
+    const origin = anchors[i]
+    const morph = anchorMorphs[i]
+    const sizeMult = anchorSize[i]
+    const bias = anchorBias[i]         // 0=vertical, 1=lateral
+    const speedOffset = anchorSpeedOffset[i]
+
+    const outward = v3.norm({ x: origin.x, y: 0, z: origin.z })
+    // Direction: blend from straight-up (bias=0) to strongly outward (bias=1)
+    const outBlend = 0.08 + bias * 0.52
+    const growDir = v3.norm({
+      x: outward.x * outBlend,
+      y: 1,
+      z: outward.z * outBlend,
+    })
+
+    // Per-morphology parameters (same as generateReefGeom but scaled to growth mode)
+    let spreadRad: number, baseLen: number, baseThick: number, maxDepth: number, growBlend: number
+    if (morph === 'branching') {
+      spreadRad = (26 + rng() * 12) * Math.PI / 180
+      maxDepth  = 6 + (rng() > 0.5 ? 1 : 0)
+      baseLen   = (32 + rng() * 14) * sizeMult
+      baseThick = (4.2 + rng() * 1.4) * sizeMult
+      growBlend = 0.20
+    } else if (morph === 'massive') {
+      spreadRad = (50 + rng() * 14) * Math.PI / 180
+      maxDepth  = 3
+      baseLen   = (16 + rng() * 8) * sizeMult
+      baseThick = (7.0 + rng() * 2.5) * sizeMult
+      growBlend = 0.52
+    } else if (morph === 'table') {
+      spreadRad = (65 + rng() * 12) * Math.PI / 180
+      maxDepth  = 3
+      baseLen   = (22 + rng() * 10) * sizeMult
+      baseThick = (5.0 + rng() * 1.8) * sizeMult
+      growBlend = 0.80
+    } else {
+      // encrusting
+      spreadRad = (75 + rng() * 12) * Math.PI / 180
+      maxDepth  = 2
+      baseLen   = (10 + rng() * 6) * sizeMult
+      baseThick = (9.0 + rng() * 3.0) * sizeMult
+      growBlend = 0.92
     }
 
-    // Rail half-width
-    const hw = ARM_WIDTH / 2
+    // Adjust grow direction based on morphology blend
+    const finalDir = v3.norm({
+      x: growDir.x * growBlend + outward.x * (1 - growBlend) * 0.3,
+      y: growDir.y * growBlend + 1 * (1 - growBlend) * 0.7,
+      z: growDir.z * growBlend + outward.z * (1 - growBlend) * 0.3,
+    })
 
-    // Build left and right rail points at each rung position on both Y planes
-    type RailPt = { low: Vec3; high: Vec3 }
-    const leftRail:  RailPt[] = []
-    const rightRail: RailPt[] = []
+    const colorIdx = i % 4
+    const localBranches: number[][] = [[], [], [], []]
+    const localTips: number[][] = [[], [], [], []]
 
-    for (let r = 0; r <= RUNG_COUNT; r++) {
-      const dist = rungPositions[r]
-      const cx = outX * dist
-      const cz = outZ * dist
-      leftRail.push({
-        low:  { x: cx - perpX * hw, y: LOW_Y,  z: cz - perpZ * hw },
-        high: { x: cx - perpX * hw, y: HIGH_Y, z: cz - perpZ * hw },
-      })
-      rightRail.push({
-        low:  { x: cx + perpX * hw, y: LOW_Y,  z: cz + perpZ * hw },
-        high: { x: cx + perpX * hw, y: HIGH_Y, z: cz + perpZ * hw },
-      })
+    const perp = randPerp(rng, finalDir)
+    const fan = spreadRad * (0.55 + rng() * 0.30)
+    const d1 = v3.norm(v3.rotAround(finalDir, perp,  fan))
+    const d2 = v3.norm(v3.rotAround(finalDir, perp, -fan))
+
+    buildBranches3D(origin, d1, baseLen, baseThick * 0.82, maxDepth, maxDepth, spreadRad, colorIdx,       localBranches, localTips, rng)
+    buildBranches3D(origin, d2, baseLen, baseThick * 0.82, maxDepth, maxDepth, spreadRad, (colorIdx+1)%4, localBranches, localTips, rng)
+    if (rng() > 0.38) {
+      const d3 = v3.norm(v3.rotAround(finalDir, outward, (rng()-0.5)*1.2))
+      buildBranches3D(origin, d3, baseLen * 0.85, baseThick * 0.70, Math.max(2, maxDepth-1), maxDepth, spreadRad, (colorIdx+2)%4, localBranches, localTips, rng)
     }
 
-    // Rails: longitudinal bars along each side of the arm
-    for (let r = 0; r < RUNG_COUNT; r++) {
-      addSeg(leftRail[r].low,   leftRail[r + 1].low,   2.4)  // left rail low
-      addSeg(leftRail[r].high,  leftRail[r + 1].high,  2.0)  // left rail high
-      addSeg(rightRail[r].low,  rightRail[r + 1].low,  2.4)  // right rail low
-      addSeg(rightRail[r].high, rightRail[r + 1].high, 2.0)  // right rail high
-    }
-
-    // Rungs: perpendicular cross-bars (the ladder rungs) — skip rung 0 (hub edge)
-    for (let r = 1; r <= RUNG_COUNT; r++) {
-      addSeg(leftRail[r].low,  rightRail[r].low,  1.8)  // rung low
-      addSeg(leftRail[r].high, rightRail[r].high, 1.6)  // rung high
-      // Vertical bars connecting low to high at each rung corner
-      addSeg(leftRail[r].low,  leftRail[r].high,  1.2)
-      addSeg(rightRail[r].low, rightRail[r].high, 1.2)
-    }
-    // Hub-edge rung (r=0) connecting arm to hub
-    addSeg(leftRail[0].low,  rightRail[0].low,  1.8)
-    addSeg(leftRail[0].high, rightRail[0].high, 1.6)
-    addSeg(leftRail[0].low,  leftRail[0].high,  1.2)
-    addSeg(rightRail[0].low, rightRail[0].high, 1.2)
-
-    // Connect arm base into hub vertices
-    const hubVertL = hubHigh[arm]
-    const hubVertR = hubHigh[(arm + 5) % 6]
-    addSeg(hubVertL, leftRail[0].high,  1.4)
-    addSeg(hubVertR, rightRail[0].high, 1.4)
-
-    // Landing legs at arm tip (low corners)
-    const legL: Vec3 = { x: leftRail[RUNG_COUNT].low.x * 0.92,  y: LEG_Y, z: leftRail[RUNG_COUNT].low.z * 0.92 }
-    const legR: Vec3 = { x: rightRail[RUNG_COUNT].low.x * 0.92, y: LEG_Y, z: rightRail[RUNG_COUNT].low.z * 0.92 }
-    addSeg(leftRail[RUNG_COUNT].low,  legL, 1.5)
-    addSeg(rightRail[RUNG_COUNT].low, legR, 1.5)
-
-    // Tip end-cap (closing bar at arm end)
-    addSeg(leftRail[RUNG_COUNT].low,  rightRail[RUNG_COUNT].low,  1.8)
-    addSeg(leftRail[RUNG_COUNT].high, rightRail[RUNG_COUNT].high, 1.6)
-
-    // Fragment anchors at each rung×rail intersection on the high plane
-    // Skip rung 0 (hub edge), place at rungs 1..RUNG_COUNT on both rails
-    for (let r = 1; r <= RUNG_COUNT; r++) {
-      const lp: Vec3 = { ...leftRail[r].high,  y: HIGH_Y + 1.8 }
-      const rp: Vec3 = { ...rightRail[r].high, y: HIGH_Y + 1.8 }
-      anchors.push(lp, rp)
-
-      // Tie bands perpendicular to arm direction (along the rung axis)
-      addTie(lp, outX, outZ, 1.3)
-      addTie(rp, outX, outZ, 1.25)
-      // Fragment stubs pointing slightly outward from center
-      addFragment(lp, -perpX + outX * 0.3, -perpZ + outZ * 0.3, 2.1)
-      addFragment(rp,  perpX + outX * 0.3,  perpZ + outZ * 0.3, 2.05)
-    }
-
-    // Hub edge anchor (r=0 midpoint of rung)
-    const hubAnchor: Vec3 = {
-      x: (leftRail[0].high.x + rightRail[0].high.x) * 0.5,
-      y: HIGH_Y + 1.8,
-      z: (leftRail[0].high.z + rightRail[0].high.z) * 0.5,
-    }
-    anchors.push(hubAnchor)
-    addTie(hubAnchor, perpX, perpZ, 1.1)
-    addFragment(hubAnchor, outX, outZ, 1.9)
-
-    // Diagonal bracing within each ladder bay (X-braces for rigidity look)
-    for (let r = 0; r < RUNG_COUNT; r++) {
-      // Cross-brace one bay for structural detail
-      if (r % 2 === 0) {
-        addSeg(leftRail[r].high,  rightRail[r + 1].high, 1.0)
-        addSeg(rightRail[r].high, leftRail[r + 1].high,  1.0)
+    // Merge into allSegs, applying speed offset to tip values
+    for (let c = 0; c < 4; c++) {
+      const src = localBranches[c]
+      const tipSrc = localTips[c]
+      let k = 0
+      for (let j = 0; j < src.length; j += 7) {
+        const rawTip = tipSrc[k] ?? 0
+        // Scale tip up by speedOffset so slower anchors need higher keepTip01 to show
+        const scaledTip = Math.min(1, rawTip * (1 + speedOffset))
+        allSegs.push({
+          x1: src[j], y1: src[j+1], z1: src[j+2],
+          x2: src[j+3], y2: src[j+4], z2: src[j+5],
+          thick: src[j+6], color: c, tip: scaledTip,
+        })
+        k++
       }
     }
   }
 
-  // Hub tip at origin for center coral anchor
-  const centerAnchor: Vec3 = { x: 0, y: HIGH_Y + 1.8, z: 0 }
-  anchors.push(centerAnchor)
-  addFragment(centerAnchor, 0, 1, 1.8)
+  // Sort into color groups for GroupStart indexing
+  const byColor: Array<typeof allSegs> = [[], [], [], []]
+  for (const seg of allSegs) byColor[seg.color].push(seg)
 
-  return { frame: generateLinesGeom(segs), ties: generateLinesGeom(ties), fragments: generateLinesGeom(fragments), anchors }
-}
-
-function generateCoralFromAnchors(anchors: Vec3[], rng: () => number): { reef: ReefGeom; colonies: number } {
-  const branchesByColor: number[][] = [[], [], [], []]
-  const tipByColor: number[][] = [[], [], [], []]
-
-  for (let i = 0; i < anchors.length; i++) {
-    const origin = anchors[i]
-    const outward = v3.norm({ x: origin.x, y: 0, z: origin.z })
-    const growDir = v3.norm({ x: outward.x * 0.22, y: 1, z: outward.z * 0.22 })
-
-    const spreadRad = (28 + rng() * 14) * Math.PI / 180
-    const maxDepth = 7
-    buildBranches3D(
-      origin,
-      growDir,
-      38,
-      4.8 + rng() * 1.4,
-      maxDepth,
-      maxDepth,
-      spreadRad,
-      i % 4,
-      branchesByColor,
-      tipByColor,
-      rng
-    )
-  }
-
-  const group0 = branchesByColor[0].length / 7
-  const group1 = branchesByColor[1].length / 7
-  const group2 = branchesByColor[2].length / 7
-  const group3 = branchesByColor[3].length / 7
+  const group0 = byColor[0].length
+  const group1 = byColor[1].length
+  const group2 = byColor[2].length
+  const group3 = byColor[3].length
   const total  = group0 + group1 + group2 + group3
 
   const geom = new Float32Array(total * 8)
@@ -628,22 +637,18 @@ function generateCoralFromAnchors(anchors: Vec3[], rng: () => number): { reef: R
   let writeIdx = 0
   let segIdx = 0
   for (let colorIndex = 0; colorIndex < 4; colorIndex++) {
-    const src = branchesByColor[colorIndex]
-    const tipSrc = tipByColor[colorIndex]
-    let k = 0
-    for (let j = 0; j < src.length; j += 7) {
-      geom[writeIdx + 0] = src[j + 0]
-      geom[writeIdx + 1] = src[j + 1]
-      geom[writeIdx + 2] = src[j + 2]
-      geom[writeIdx + 3] = src[j + 3]
-      geom[writeIdx + 4] = src[j + 4]
-      geom[writeIdx + 5] = src[j + 5]
-      geom[writeIdx + 6] = src[j + 6]
+    for (const seg of byColor[colorIndex]) {
+      geom[writeIdx + 0] = seg.x1
+      geom[writeIdx + 1] = seg.y1
+      geom[writeIdx + 2] = seg.z1
+      geom[writeIdx + 3] = seg.x2
+      geom[writeIdx + 4] = seg.y2
+      geom[writeIdx + 5] = seg.z2
+      geom[writeIdx + 6] = seg.thick
       geom[writeIdx + 7] = colorIndex
-      tip[segIdx] = tipSrc[k] ?? 0
+      tip[segIdx] = seg.tip
       writeIdx += 8
       segIdx++
-      k++
     }
   }
 
@@ -674,8 +679,8 @@ function generateScene(w: number, h: number, mode: CanvasMode): Scene {
     const maxY = 6
     const minY = -10
 
-    const placements: Array<{ offset: Vec3; scale: number; colonies: number; start?: number; span?: number; fade?: number }> = []
-    const count = 19
+    const placements: Array<{ offset: Vec3; scale: number; colonies: number; start?: number; span?: number; fade?: number; morphology?: CoralMorphology }> = []
+    const count = 11   // reduced from 19 — fewer, bolder colonies with clearer individual identity
     const halfWidth = 980
     for (let i = 0; i < count; i++) {
       const t = count <= 1 ? 0 : i / (count - 1)
@@ -710,18 +715,27 @@ function generateScene(w: number, h: number, mode: CanvasMode): Scene {
       span *= 0.92 + rng() * 0.2
 
       const centerBoost = 1 - d
-      const scale = (0.88 + centerBoost * 0.28) * (0.96 + rng() * 0.08)
-      const colonies = d < 0.34 ? 7 : d < 0.62 ? 6 : 5
+      // Hero colonies in center are noticeably larger — create clear visual hierarchy
+      const scale = (0.78 + centerBoost * 0.72) * (0.96 + rng() * 0.08)
+      const colonies = d < 0.22 ? 12 : d < 0.58 ? 9 : 6
 
       // Keep one core survivor through TODAY.
-      const isCore = Math.abs(x) < 56
+      const isCore = Math.abs(x) < 70
+      // Assign morphology mix: 40% branching, 25% massive, 20% table, 15% encrusting
+      const morphSeed = rng()
+      const morphology: CoralMorphology = morphSeed < 0.40 ? 'branching'
+        : morphSeed < 0.65 ? 'massive'
+        : morphSeed < 0.85 ? 'table'
+        : 'encrusting'
+
       placements.push({
         offset: { x, y, z: zPlane },
         scale,
-        colonies: isCore ? 8 : colonies,
+        colonies: isCore ? 12 : colonies,
         start: isCore ? 9999 : start,
         span: isCore ? 1 : span,
         fade: isCore ? 1 : fade,
+        morphology,
       })
     }
 
@@ -734,7 +748,8 @@ function generateScene(w: number, h: number, mode: CanvasMode): Scene {
         p.scale,
         layout,
         reefRng,
-        { collapseStartYear: p.start, collapseSpanYears: p.span, baseFade: p.fade }
+        { collapseStartYear: p.start, collapseSpanYears: p.span, baseFade: p.fade },
+        p.morphology
       )
       reefs.push(reef)
       colonyCount += colonies
@@ -752,24 +767,41 @@ function generateScene(w: number, h: number, mode: CanvasMode): Scene {
 
   const segmentsTotal = reefs.reduce((sum, r) => sum + r.geom.length / 8, 0)
 
-  // Fish: 12 on 3 orbital rings (inner/mid/outer), orbit order.
-  const fishCount = 12
-  const fish = new Float32Array(fishCount * 8)
-  const ringR = mode === 'reef-health' ? [240, 320, 420] : [160, 220, 290]
+  // Fish: 20 on 4 orbital rings, each with distinct body shape types.
+  // Float layout per fish (stride=12): [rx, rz, y, phase, speed, bodyLen, bodyH, colorIndex, shapeType, 0, 0, 0]
+  // Shape types: 0=oval parrotfish, 1=tall angelfish, 2=long trumpetfish, 3=round puffer, 4=flat butterflyfish
+  const fishCount = 20
+  const FISH_STRIDE = 12
+  const fish = new Float32Array(fishCount * FISH_STRIDE)
+  const ringR = mode === 'reef-health' ? [200, 310, 420, 560] : [130, 200, 290, 380]
   const fishRng = makeRng(mode === 'reef-health' ? 9001 : 9002)
+  // Extended palette for fish — 8 colors including yellows, blues, whites
+  const FISH_COLORS_COUNT = 8
   let fi = 0
-  for (let ring = 0; ring < 3; ring++) {
-    for (let k = 0; k < 4; k++) {
-      const base = fi * 8
+  const fishPerRing = [6, 5, 5, 4]  // 20 total
+  for (let ring = 0; ring < 4; ring++) {
+    for (let k = 0; k < fishPerRing[ring]; k++) {
+      const base = fi * FISH_STRIDE
       const r = ringR[ring]
-      const orbitRadiusX = r * (0.9 + fishRng() * 0.25)
-      const orbitRadiusZ = r * (0.9 + fishRng() * 0.25)
-      const orbitY = 18 + ring * 12 + fishRng() * 16
+      const orbitRadiusX = r * (0.88 + fishRng() * 0.30)
+      const orbitRadiusZ = r * (0.88 + fishRng() * 0.30)
+      // Size tier: ring 0 = tiny (gobies), ring 1-2 = mid, ring 3 = large
+      let bodyLen: number, bodyH: number
+      if (ring === 0) {
+        bodyLen = 10 + fishRng() * 10   // tiny chromis/goby
+        bodyH   = 4  + fishRng() * 5
+      } else if (ring === 3) {
+        bodyLen = 50 + fishRng() * 34   // large grouper/snapper silhouette
+        bodyH   = 16 + fishRng() * 16
+      } else {
+        bodyLen = 22 + fishRng() * 18   // mid angelfish/parrotfish
+        bodyH   = 9  + fishRng() * 10
+      }
+      const orbitY = 20 + ring * 18 + fishRng() * 20
       const orbitPhase = fishRng() * TAU
-      const orbitSpeed = 0.3 + fishRng() * 0.6
-      const bodyLen = 18 + fishRng() * 10
-      const bodyH = 6 + fishRng() * 4
-      const colorIndex = Math.floor(fishRng() * 4)
+      const orbitSpeed = 0.2 + fishRng() * 0.7
+      const colorIndex = Math.floor(fishRng() * FISH_COLORS_COUNT)
+      const shapeType  = Math.floor(fishRng() * 5)  // 0-4
 
       fish[base + 0] = orbitRadiusX
       fish[base + 1] = orbitRadiusZ
@@ -779,6 +811,7 @@ function generateScene(w: number, h: number, mode: CanvasMode): Scene {
       fish[base + 5] = bodyLen
       fish[base + 6] = bodyH
       fish[base + 7] = colorIndex
+      fish[base + 8] = shapeType
       fi++
     }
   }
@@ -795,6 +828,22 @@ function generateScene(w: number, h: number, mode: CanvasMode): Scene {
     coralColor('reef-health', 2, 100),
     coralColor('reef-health', 3, 100),
   ]
+
+  // Floating particles (plankton / particulate) — 45 particles, each with x/y/speed/phase
+  const PARTICLE_COUNT = 45
+  const particles = new Float32Array(PARTICLE_COUNT * 4)
+  const pRng = makeRng(5555)
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    particles[i * 4 + 0] = pRng() * w          // x position
+    particles[i * 4 + 1] = pRng() * h          // y position
+    particles[i * 4 + 2] = 0.04 + pRng() * 0.16  // drift speed (px/frame)
+    particles[i * 4 + 3] = pRng() * TAU        // phase for oscillation + opacity
+  }
+
+  // Caustic blob phases — 7 animated light patches on seafloor
+  const causticsSeeds = new Float32Array(7)
+  const cRng = makeRng(6666)
+  for (let i = 0; i < 7; i++) causticsSeeds[i] = cRng() * TAU
 
   // Vignette (subtle, keeps focus on the specimen).
   const vignetteCanvas = document.createElement('canvas')
@@ -843,6 +892,8 @@ function generateScene(w: number, h: number, mode: CanvasMode): Scene {
     reefStarFrame,
     reefStarTies,
     reefStarFragments,
+    particles,
+    causticsSeeds,
     frame: 0,
     w,
     h,
@@ -1102,7 +1153,8 @@ function drawFrame(
   const { w, h, reefs } = scene
   const cx   = w / 2
   // Frame position: keep Reef Health centered; push Reef Star slightly lower to feel more monumental.
-  const cy   = mode === 'reef-health' ? (h * 0.50) : (h * 0.54)
+  // Push health-mode reef lower in frame so it fills the bottom 40-50% like an underwater landscape
+  const cy   = mode === 'reef-health' ? (h * 0.62) : (h * 0.54)
   const ox = cx + panX
   const oy = cy + panY
   // Auto-rotation disabled: keep a fixed camera-facing angle for both modes.
@@ -1131,6 +1183,38 @@ function drawFrame(
     scene.lastBloomHealthKey = healthKey
   }
   ctx.drawImage(scene.bloomCanvas, 0, 0)
+
+  // ─── Seafloor gradient (drawn before coral — natural ground plane) ─────────
+  {
+    const floorTop = h * 0.75
+    const floorGrad = ctx.createLinearGradient(0, floorTop, 0, h)
+    floorGrad.addColorStop(0, 'rgba(58, 40, 18, 0)')
+    floorGrad.addColorStop(0.6, 'rgba(58, 40, 18, 0.38)')
+    floorGrad.addColorStop(1, 'rgba(58, 40, 18, 0.64)')
+    ctx.globalAlpha = 1
+    ctx.fillStyle = floorGrad
+    ctx.fillRect(0, floorTop, w, h - floorTop)
+  }
+
+  // ─── Caustic light patches (refracted sunlight shimmering on seafloor) ────
+  {
+    const causticBaseY = h * 0.86
+    for (let ci = 0; ci < 7; ci++) {
+      const phase = scene.causticsSeeds[ci]
+      const cx2 = ox + (ci - 3) * (w * 0.13) + Math.sin(t * 0.28 + phase) * 32
+      const cy2 = causticBaseY + Math.cos(t * 0.17 + phase * 1.4) * 14
+      const rx2 = 44 + Math.sin(t * 0.21 + phase * 0.9) * 15
+      const ry2 = 17 + Math.sin(t * 0.33 + phase * 1.2) * 6
+      const cg = ctx.createRadialGradient(cx2, cy2, 0, cx2, cy2, rx2)
+      cg.addColorStop(0, 'rgba(160, 210, 255, 0.10)')
+      cg.addColorStop(1, 'rgba(160, 210, 255, 0)')
+      ctx.globalAlpha = 1
+      ctx.fillStyle = cg
+      ctx.beginPath()
+      ctx.ellipse(cx2, cy2, rx2, ry2, 0, 0, TAU)
+      ctx.fill()
+    }
+  }
 
   const c = Math.cos(rotY)
   const s = Math.sin(rotY)
@@ -1211,13 +1295,29 @@ function drawFrame(
       const zSpan = Math.max(1e-3, maxZ - minZ)
       const z0 = minZ + zSpan * 0.34
       const z1 = minZ + zSpan * 0.68
-      const lw = Math.max(1.05, 2.15 * zoom)
+      const lw = Math.max(2.0, 4.2 * zoom)
 
-      // Depth-shaded 3-pass stroke: back → front to sell a 3D cage (no per-segment styling in the hot loop).
+      // Clean steel — engineered look. Three passes: glow → back → front.
       ctx.globalCompositeOperation = 'source-over'
       ctx.filter = 'none'
 
-      // Back bucket (darker steel).
+      // Glow pre-pass: ALL segments, wide cyan halo.
+      ctx.beginPath()
+      for (let i = 0; i < segCount; i++) {
+        const p = i * 5
+        ctx.moveTo(frame.proj[p + 0], frame.proj[p + 1])
+        ctx.lineTo(frame.proj[p + 2], frame.proj[p + 3])
+      }
+      ctx.globalCompositeOperation = 'lighter'
+      ctx.filter = 'blur(10px)'
+      ctx.globalAlpha = frameAlpha * 0.20
+      ctx.strokeStyle = '#4dd9f0'
+      ctx.lineWidth = lw * 3.2
+      ctx.stroke()
+      ctx.filter = 'none'
+      ctx.globalCompositeOperation = 'source-over'
+
+      // Back bucket (deep steel blue).
       ctx.beginPath()
       for (let i = 0; i < segCount; i++) {
         const p = i * 5
@@ -1225,12 +1325,12 @@ function drawFrame(
         ctx.moveTo(frame.proj[p + 0], frame.proj[p + 1])
         ctx.lineTo(frame.proj[p + 2], frame.proj[p + 3])
       }
-      ctx.globalAlpha = frameAlpha * 0.78
-      ctx.strokeStyle = '#4d5868'
-      ctx.lineWidth = lw * 0.92
+      ctx.globalAlpha = frameAlpha * 0.72
+      ctx.strokeStyle = '#2e5a78'
+      ctx.lineWidth = lw * 0.90
       ctx.stroke()
 
-      // Mid bucket.
+      // Mid bucket (steel blue).
       ctx.beginPath()
       for (let i = 0; i < segCount; i++) {
         const p = i * 5
@@ -1240,11 +1340,11 @@ function drawFrame(
         ctx.lineTo(frame.proj[p + 2], frame.proj[p + 3])
       }
       ctx.globalAlpha = frameAlpha
-      ctx.strokeStyle = '#7b8797'
+      ctx.strokeStyle = '#6aaed6'
       ctx.lineWidth = lw
       ctx.stroke()
 
-      // Front bucket + specular glint.
+      // Front bucket: soft glow + crisp bright highlight.
       ctx.beginPath()
       for (let i = 0; i < segCount; i++) {
         const p = i * 5
@@ -1253,16 +1353,16 @@ function drawFrame(
         ctx.lineTo(frame.proj[p + 2], frame.proj[p + 3])
       }
       ctx.globalCompositeOperation = 'lighter'
-      ctx.filter = 'blur(4px)'
-      ctx.globalAlpha = frameAlpha * 0.28
-      ctx.strokeStyle = '#c8d3e6'
-      ctx.lineWidth = lw * 1.95
+      ctx.filter = 'blur(5px)'
+      ctx.globalAlpha = frameAlpha * 0.32
+      ctx.strokeStyle = '#a8ddf5'
+      ctx.lineWidth = lw * 2.2
       ctx.stroke()
       ctx.filter = 'none'
       ctx.globalCompositeOperation = 'source-over'
-      ctx.globalAlpha = frameAlpha * 0.96
-      ctx.strokeStyle = '#aebcd1'
-      ctx.lineWidth = lw * 0.96
+      ctx.globalAlpha = frameAlpha * 0.98
+      ctx.strokeStyle = '#d4edf5'
+      ctx.lineWidth = lw
       ctx.stroke()
 
       if (ties) {
@@ -1381,13 +1481,18 @@ function drawFrame(
     }
 
     const baseFade = mode === 'reef-health' ? (reef.baseFade ?? 0.9) : 1
-    // Keep opacity high until reef is nearly fully dead — color/whitening tells the story, not fading to black.
+
+    // Two-stage deterioration:
+    // Stage 1 (reefLife01: 1.0 → 0.25): full opacity, coral turns white — color loss tells the story
+    // Stage 2 (reefLife01: 0.25 → 0.0): still white, opacity fades out (branches break off / disappear)
     const reefFade = mode === 'reef-health'
-      ? Math.max(0, reefLife01 < 0.08 ? reefLife01 * 12.5 : 1.0) * baseFade
+      ? Math.max(0, reefLife01 < 0.25 ? (reefLife01 / 0.25) : 1.0) * baseFade
       : 1
-    // bleachAmt drives color→white storytelling: stressed reefs bleach hard, dying reefs go full white then vanish.
-    const bleachAmt = mode === 'reef-health'
-      ? Math.max(0, Math.min(1, stress01 * 0.5 + (1 - reefLife01) * 1.1))
+
+    // whiteAmt: 0 = vibrant color, 1 = pure white. Driven purely by collapse progress (not global stress).
+    // Separate from global stress (which only does tip-dieback). Collapsing reefs go white → then vanish.
+    const whiteAmt = mode === 'reef-health'
+      ? Math.max(0, Math.min(1, (1 - reefLife01) / 0.75))
       : 0
 
     let th0 = 0, th1 = 0, th2 = 0, th3 = 0
@@ -1489,28 +1594,19 @@ function drawFrame(
       ctx.lineWidth = lineW
       ctx.stroke()
 
-      // Reef Health bleaching: tips whiten first, then the whitening front moves inward.
-      if (mode === 'reef-health' && bleachAmt > 0.04) {
-        const front = Math.max(0.08, Math.min(0.92, 0.80 - 0.58 * bleachAmt + group * 0.02))
-        ctx.beginPath()
-        for (let i = start; i < end; i++) {
-          const tip01 = tip[i]
-          if (tip01 > keepTipReef) continue
-          if (tip01 < front) continue
-          const p = i * 5
-          if (proj[p + 4] <= -1e8) continue
-          ctx.moveTo(proj[p + 0], proj[p + 1])
-          ctx.lineTo(proj[p + 2], proj[p + 3])
-        }
-        ctx.globalAlpha = (0.06 + 0.34 * bleachAmt) * reefFade
-        ctx.strokeStyle = BLEACH_COLOR
-        ctx.lineWidth = lineW * 1.03
+      // Whitening pass: dying reefs go pure white BEFORE losing opacity.
+      // whiteAmt=0 = vibrant, whiteAmt=1 = fully white. Applied over entire coral (not just tips).
+      if (mode === 'reef-health' && whiteAmt > 0.03) {
+        // Reuse the same path (already drawn above), just re-stroke with white overlay
+        ctx.globalAlpha = Math.min(0.98, whiteAmt * 1.05) * reefFade
+        ctx.strokeStyle = '#ffffff'
+        ctx.lineWidth = lineW
         ctx.stroke()
       }
     }
   }
 
-  // Reef Star outline pass (after coral): keep the frame readable even when densely overgrown.
+  // Reef Star outline pass (after coral): keep the frame readable through dense overgrowth via a subtle glow.
   if (mode === 'reef-star-growth' && scene.reefStarFrame) {
     const frame = scene.reefStarFrame
     const segCount = frame.geom.length / 7
@@ -1521,53 +1617,61 @@ function drawFrame(
       ctx.lineTo(frame.proj[p + 2], frame.proj[p + 3])
     }
     ctx.globalCompositeOperation = 'lighter'
-    ctx.globalAlpha = 0.08 + 0.06 * (1 - health01)
-    ctx.strokeStyle = '#8fa6c8'
-    ctx.lineWidth = Math.max(0.7, 1.35 * zoom)
+    ctx.filter = 'blur(4px)'
+    ctx.globalAlpha = (0.06 + 0.08 * (1 - health01)) * Math.min(1, health01 * 3)
+    ctx.strokeStyle = '#4dd9f0'
+    ctx.lineWidth = Math.max(1.2, 2.5 * zoom)
     ctx.stroke()
+    ctx.filter = 'none'
     ctx.globalCompositeOperation = 'source-over'
     ctx.globalAlpha = 1
   }
 
   // Fish (drawn after coral; orbit order, no depth-sort per fish).
+  // Extended 8-color palette: vivid reef fish colors
+  const FISH_PALETTE = [
+    '#ff6b9e', '#ff8c42', '#00c9a7', '#c77dff',  // original 4
+    '#ffe033', '#2ad4ff', '#ffffff', '#ff4444',    // yellow, cyan-blue, white, red
+  ]
+  const FISH_STRIDE = 12
   const fish = scene.fish
   const maxFish = scene.fishCount
-  const minFish = mode === 'reef-star-growth' ? 1 : 2
+  const minFish = mode === 'reef-star-growth' ? 2 : 4
   const target = mode === 'reef-star-growth'
-    ? (minFish + (maxFish - minFish) * Math.pow(health01, 1.9))
-    : (maxFish - (maxFish - minFish) * Math.max(0, Math.min(1, (100 - health) / 50)))
+    ? (minFish + (maxFish - minFish) * Math.pow(health01, 1.4))
+    : (maxFish - (maxFish - minFish) * Math.max(0, Math.min(1, (100 - health) / 60)))
   const clampedTarget = Math.max(minFish, Math.min(maxFish, target))
   const fullCount = Math.floor(clampedTarget)
   const fade = clampedTarget - fullCount
   const fadeIndex = fade > 0.001 && fullCount < maxFish ? fullCount : -1
+  // Much more opaque fish — they should read clearly on the reef scene
   const fishBaseAlpha = mode === 'reef-star-growth'
-    ? (0.16 + 0.84 * health01)
-    : (0.03 + 0.17 * (1 - stress01))
+    ? (0.52 + 0.48 * health01)
+    : (0.48 + 0.42 * health01)
 
-  // Bodies: batch by color for fully-visible fish.
-  for (let group = 0; group < 4; group++) {
+  // Bodies: one draw call per color (8 groups now)
+  for (let group = 0; group < 8; group++) {
     ctx.beginPath()
     for (let idx = 0; idx < fullCount; idx++) {
-      const base = idx * 8
+      const base = idx * FISH_STRIDE
       if ((fish[base + 7] | 0) !== group) continue
       addFishBodyToPath(ctx, fish, base, t, c, s, ox, oy, zoom)
     }
     ctx.globalAlpha = fishBaseAlpha
-    ctx.fillStyle = HEALTHY_COLORS[group]
+    ctx.fillStyle = FISH_PALETTE[group]
     ctx.fill()
   }
 
   // Fade fish (at most one).
   if (fadeIndex >= 0) {
-    const base = fadeIndex * 8
-    const group = fish[base + 7] | 0
+    const base = fadeIndex * FISH_STRIDE
+    const group = (fish[base + 7] | 0) % 8
     ctx.beginPath()
     addFishBodyToPath(ctx, fish, base, t, c, s, ox, oy, zoom)
     ctx.globalAlpha = fishBaseAlpha * fade
-    ctx.fillStyle = HEALTHY_COLORS[group]
+    ctx.fillStyle = FISH_PALETTE[group]
     ctx.fill()
 
-    // Eye for fade fish.
     ctx.beginPath()
     addFishEyeToPath(ctx, fish, base, t, c, s, ox, oy, zoom)
     ctx.globalAlpha = fishBaseAlpha * fade
@@ -1578,23 +1682,40 @@ function drawFrame(
   // Eyes: batch for fully-visible fish.
   ctx.beginPath()
   for (let idx = 0; idx < fullCount; idx++) {
-    const base = idx * 8
+    const base = idx * FISH_STRIDE
     addFishEyeToPath(ctx, fish, base, t, c, s, ox, oy, zoom)
   }
   ctx.globalAlpha = fishBaseAlpha
   ctx.fillStyle = 'rgba(0,0,0,0.85)'
   ctx.fill()
 
-  // Sand seafloor strip at bottom of health scene — natural visual blocker preventing bommies from floating at screen edge.
-  if (mode === 'reef-health') {
-    const sandGrad = ctx.createLinearGradient(0, h * 0.72, 0, h)
-    sandGrad.addColorStop(0, 'rgba(0,0,0,0)')
-    sandGrad.addColorStop(0.55, 'rgba(140, 105, 55, 0.18)')
-    sandGrad.addColorStop(1, 'rgba(100, 75, 35, 0.55)')
+  // ─── Floating particles (plankton / water particulate) ───────────────────
+  ctx.globalCompositeOperation = 'source-over'
+  for (let pi2 = 0; pi2 < 45; pi2++) {
+    const pb = pi2 * 4
+    // Drift upward each frame, wrap when off-screen top
+    scene.particles[pb + 1] -= scene.particles[pb + 2]
+    if (scene.particles[pb + 1] < -4) scene.particles[pb + 1] = h + 4
+    const px2 = scene.particles[pb + 0] + Math.sin(t * 0.38 + scene.particles[pb + 3]) * 2.2
+    const py2 = scene.particles[pb + 1]
+    const palpha = 0.07 + 0.15 * Math.abs(Math.sin(t * 0.55 + scene.particles[pb + 3]))
+    ctx.globalAlpha = palpha
+    ctx.fillStyle = '#b0d4f0'
+    ctx.beginPath()
+    ctx.arc(px2, py2, 1.3, 0, TAU)
+    ctx.fill()
+  }
+  ctx.globalAlpha = 1
+
+  // ─── Final seafloor darkening band (covers bottom edge, anchors coral visually) ─
+  {
+    const sandFinal = ctx.createLinearGradient(0, h * 0.82, 0, h)
+    sandFinal.addColorStop(0, 'rgba(30, 20, 8, 0)')
+    sandFinal.addColorStop(1, 'rgba(30, 20, 8, 0.50)')
     ctx.globalCompositeOperation = 'source-over'
     ctx.globalAlpha = 1
-    ctx.fillStyle = sandGrad
-    ctx.fillRect(0, 0, w, h)
+    ctx.fillStyle = sandFinal
+    ctx.fillRect(0, h * 0.82, w, h * 0.18)
   }
 
   // Subtle post overlays (ARBORIST: felt, not seen).

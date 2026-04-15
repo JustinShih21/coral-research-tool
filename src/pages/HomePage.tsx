@@ -77,7 +77,7 @@ export default function HomePage() {
     <div className="home-page">
       <section className="home-hero">
         <div className="home-hero-copy">
-          <p className="home-kicker">Coral Research Initiative</p>
+          <p className="home-kicker">Restore The Reefs</p>
           <h1>Reef restoration that communities can fund, run, and scale.</h1>
           <p>
             We help turn coral restoration into investable, community-led programs across Indonesia.

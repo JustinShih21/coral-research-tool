@@ -81,7 +81,7 @@ export default function DonationPage() {
   const [frequency, setFrequency] = useState<'monthly' | 'one-time'>('monthly')
   const [selectedAmount, setSelectedAmount] = useState<number>(POPULAR_PRESET_AMOUNT)
   const [customAmount, setCustomAmount] = useState('')
-  const [activeFaqIndex, setActiveFaqIndex] = useState(0)
+  const [activeFaqIndex, setActiveFaqIndex] = useState(-1)
 
   const customAmountValue = parseCurrency(customAmount)
   const donationAmount = customAmountValue > 0 ? customAmountValue : selectedAmount
@@ -275,11 +275,15 @@ export default function DonationPage() {
               <button
                 type="button"
                 aria-expanded={activeFaqIndex === index}
-                onClick={() => setActiveFaqIndex(index)}
+                onClick={() => setActiveFaqIndex((i) => (i === index ? -1 : index))}
               >
                 {faq.question}
               </button>
-              {activeFaqIndex === index && <p>{faq.answer}</p>}
+              <div className={`faq-answer-wrap${activeFaqIndex === index ? ' expanded' : ''}`}>
+                <div className="faq-answer-inner">
+                  <p>{faq.answer}</p>
+                </div>
+              </div>
             </article>
           ))}
         </div>

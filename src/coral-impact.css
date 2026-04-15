@@ -86,6 +86,32 @@
   gap: 1rem;
 }
 
+.ci-nav-brand-group {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.ci-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--ci-muted) 35%, transparent);
+  color: var(--ci-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 140ms ease, color 140ms ease;
+  white-space: nowrap;
+}
+
+.ci-back-link:hover {
+  background: color-mix(in srgb, var(--ci-ocean) 12%, transparent);
+  color: var(--ci-text);
+}
+
 .ci-brand {
   display: inline-flex;
   align-items: center;

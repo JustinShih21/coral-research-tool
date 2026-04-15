@@ -4,7 +4,7 @@ export function getDefaultTeamSiteData(): TeamSiteData {
   return {
     teamOverview: {
       title: 'Meet the team',
-      subtitle: 'Coral Research Initiative',
+      subtitle: 'Restore The Reefs',
       missionParagraphs: [
         'We are a multidisciplinary cohort focused on restoration finance, field partnerships, and transparent research outcomes.',
         'Together we connect capital, community, and science so reef restoration can scale with accountability.',

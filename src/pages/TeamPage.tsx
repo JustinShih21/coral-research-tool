@@ -34,7 +34,7 @@ export default function TeamPage() {
   return (
     <div className="team-page">
       <header className="team-hero">
-        <p className="team-kicker">Coral Research Initiative</p>
+        <p className="team-kicker">Restore The Reefs</p>
         <h1>{teamOverview.title}</h1>
         {teamOverview.subtitle && <p className="team-hero-sub">{teamOverview.subtitle}</p>}
         <p className="team-public-note">

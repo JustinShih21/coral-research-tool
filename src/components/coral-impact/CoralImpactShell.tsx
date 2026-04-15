@@ -72,10 +72,18 @@ export default function CoralImpactShell({ page, showMobileDonate = false, child
 
       <header className={`ci-nav ${scrolled ? 'is-solid' : ''}`}>
         <div className="ci-nav-inner">
-          <Link to="/coral-impact" className="ci-brand">
-            <span className="ci-brand-mark" aria-hidden />
-            <span className="ci-brand-wordmark">Coral Impact</span>
-          </Link>
+          <div className="ci-nav-brand-group">
+            <Link to="/" className="ci-back-link" aria-label="Back to main site">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+                <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Main site
+            </Link>
+            <Link to="/coral-impact" className="ci-brand">
+              <span className="ci-brand-mark" aria-hidden />
+              <span className="ci-brand-wordmark">Coral Impact</span>
+            </Link>
+          </div>
 
           <nav className="ci-nav-links" aria-label="Coral impact pages">
             {PAGE_LINKS.map((entry) => (
